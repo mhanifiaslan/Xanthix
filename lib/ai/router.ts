@@ -100,6 +100,11 @@ export async function runPrompt(input: RunPromptInput): Promise<RunPromptResult>
   );
 }
 
+// Hard ceiling per section. Anything longer than this tends to be a
+// hung connection, not real work — far better to fail fast and let the
+// user retry than to keep a Server Action open indefinitely.
+const VERTEX_TIMEOUT_MS = 90_000;
+
 async function runVertex(input: RunPromptInput, t0: number): Promise<RunPromptResult> {
   const vertex = getVertexClient();
 
@@ -115,9 +120,24 @@ async function runVertex(input: RunPromptInput, t0: number): Promise<RunPromptRe
     },
   });
 
-  const result = await generativeModel.generateContent({
+  const generation = generativeModel.generateContent({
     contents: [{ role: 'user', parts: [{ text: input.userPrompt }] }],
   });
+
+  const result = await Promise.race([
+    generation,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Vertex AI request timed out after ${VERTEX_TIMEOUT_MS / 1000}s — retry from the UI`,
+            ),
+          ),
+        VERTEX_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 
   const candidate = result.response.candidates?.[0];
   const text =
