@@ -50,3 +50,31 @@ export function buildSystemPrompt(projectType: ProjectType): string {
     'Never fabricate references, citations, statistics, or numbers.',
   ].join(' ');
 }
+
+/**
+ * Builds the user prompt for a section revision. Wraps the original task,
+ * the current content, and the user's revision instruction in a structure
+ * that lets the model reproduce the section as a whole — not just the
+ * patch — while still respecting the section's original criteria.
+ */
+export function buildRevisionPrompt(opts: {
+  originalPrompt: string;
+  currentContent: string;
+  userInstruction: string;
+}): string {
+  return [
+    '## Original task',
+    opts.originalPrompt,
+    '',
+    '## Current draft of this section',
+    '```',
+    opts.currentContent,
+    '```',
+    '',
+    '## Revision request from the user',
+    opts.userInstruction.trim(),
+    '',
+    '## Output instructions',
+    'Apply the revision request faithfully while keeping the section structurally consistent with the original task and its acceptance criteria. Output the FULL revised section, not a diff. Maintain the same Markdown rules (proper tables with separator rows, one row per line, blank lines between blocks).',
+  ].join('\n');
+}

@@ -177,6 +177,54 @@ export async function recordGeneratedSection(
   });
 }
 
+export interface ReviseSectionInput {
+  projectId: string;
+  sectionId: string;
+  newContent: string;
+  generationMeta: NonNullable<SectionDoc['generationMeta']>;
+}
+
+export async function recordRevisedSection(input: ReviseSectionInput): Promise<void> {
+  const now = FieldValue.serverTimestamp();
+  const projectRef = db().collection('projects').doc(input.projectId);
+  const sectionRef = projectRef.collection('sections').doc(input.sectionId);
+
+  await db().runTransaction(async (tx) => {
+    const sectionSnap = await tx.get(sectionRef);
+    if (!sectionSnap.exists) throw new Error('Section not found');
+
+    tx.update(sectionRef, {
+      content: input.newContent,
+      status: 'ready' as const,
+      generationMeta: input.generationMeta,
+      revisedCount: FieldValue.increment(1),
+      lastRevisedAt: now,
+      updatedAt: now,
+    });
+
+    tx.update(projectRef, {
+      tokensSpent: FieldValue.increment(input.generationMeta.paiTokensCharged),
+      updatedAt: now,
+    });
+  });
+}
+
+export async function setSectionStatus(
+  projectId: string,
+  sectionId: string,
+  status: 'pending' | 'generating' | 'ready' | 'revising' | 'failed',
+): Promise<void> {
+  await db()
+    .collection('projects')
+    .doc(projectId)
+    .collection('sections')
+    .doc(sectionId)
+    .update({
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+}
+
 export async function markSectionFailed(opts: {
   projectId: string;
   sectionId: string;

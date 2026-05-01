@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -9,6 +9,8 @@ import {
   CircleDashed,
   Loader2,
   RefreshCw,
+  Sparkles,
+  X,
 } from 'lucide-react';
 import {
   collection,
@@ -18,7 +20,10 @@ import {
   query,
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from '@/lib/firebase/client';
-import { generateNextSectionAction } from '@/lib/actions/projects';
+import {
+  generateNextSectionAction,
+  reviseSectionAction,
+} from '@/lib/actions/projects';
 import Markdown from '@/components/shared/Markdown';
 
 interface SectionView {
@@ -208,6 +213,8 @@ export default function ProjectView({
                 key={section?.id ?? `pending-${i}`}
                 index={i}
                 section={section}
+                projectId={projectId}
+                projectStatus={project.status}
                 isCurrent={
                   project.status === 'generating' &&
                   project.currentSectionIndex === i
@@ -242,10 +249,14 @@ function StatusBadge({ status }: { status: ProjectView['status'] }) {
 function SectionCard({
   index,
   section,
+  projectId,
+  projectStatus,
   isCurrent,
 }: {
   index: number;
   section: SectionView | undefined;
+  projectId: string;
+  projectStatus: ProjectView['status'];
   isCurrent: boolean;
 }) {
   if (!section) {
@@ -284,8 +295,11 @@ function SectionCard({
     );
   }
 
+  const isRevising = section.status === 'revising';
+  const canRevise = section.status === 'ready' && projectStatus !== 'generating';
+
   return (
-    <li className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5">
+    <li className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5 relative">
       <div className="flex items-start gap-3 mb-3">
         <span className="shrink-0 w-7 h-7 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center text-xs font-bold text-[var(--color-accent)]">
           {index + 1}
@@ -298,11 +312,118 @@ function SectionCard({
             {section.status === 'ready' && (
               <CheckCircle2 size={14} className="text-[var(--color-success)]" />
             )}
+            {isRevising && (
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)]">
+                <Loader2 size={12} className="animate-spin" /> revize ediliyor…
+              </span>
+            )}
           </div>
         </div>
       </div>
-      <Markdown>{section.content}</Markdown>
+      <div className={isRevising ? 'opacity-60 transition-opacity' : ''}>
+        <Markdown>{section.content}</Markdown>
+      </div>
+      {canRevise && (
+        <ReviseSectionInline projectId={projectId} sectionId={section.id} />
+      )}
     </li>
+  );
+}
+
+function ReviseSectionInline({
+  projectId,
+  sectionId,
+}: {
+  projectId: string;
+  sectionId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/10 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/20 transition-colors"
+      >
+        <Sparkles size={12} />
+        Bu bölümü revize et
+      </button>
+    );
+  }
+
+  const submit = () => {
+    setError(null);
+    if (text.trim().length < 8) {
+      setError('Lütfen revizyon talebini en az 8 karakterle yaz.');
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await reviseSectionAction({
+          projectId,
+          sectionId,
+          instruction: text.trim(),
+        });
+        setText('');
+        setOpen(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Revize başarısız.');
+      }
+    });
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-[var(--color-accent)]/20 bg-[var(--color-accent)]/5 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-[var(--color-accent)] uppercase tracking-wider">
+          Bu bölümü revize et
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+          className="p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+          aria-label="Kapat"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <textarea
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Örn: Bütçeyi 60.000 EUR'ya çıkar, çalıştay sayısını ikiye düşür."
+        className="w-full bg-[var(--color-background)] border border-white/10 rounded-lg px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all resize-y"
+        disabled={isPending}
+      />
+      {error && (
+        <p className="text-xs text-[var(--color-error)]">{error}</p>
+      )}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] text-[var(--color-text-secondary)]/70">
+          AI bütün bölümü baştan yazar; mevcut içerik bağlam olarak kullanılır.
+        </p>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={isPending || text.trim().length < 8}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors disabled:opacity-50"
+        >
+          {isPending ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Sparkles size={12} />
+          )}
+          Revize et
+        </button>
+      </div>
+    </div>
   );
 }
 
