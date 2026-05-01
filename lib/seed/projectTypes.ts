@@ -20,9 +20,29 @@ const SHARED_INSTRUCTION = `
 You are an expert grant writer producing a section of a real funding application.
 Match the tone and conventions of the program. Be concrete, evidence-driven,
 and avoid filler. Output MUST be in {{outputLanguage}} and use Markdown
-formatting (headings, bullet points, tables where helpful). When you need a
-fact you don't have, surface it as a clearly-marked TODO so the user can fill
-it in. Never fabricate references or numbers.
+formatting. When you need a fact you don't have, surface it as a clearly-marked
+TODO so the user can fill it in. Never fabricate references or numbers.
+
+STRICT MARKDOWN RULES — these break the renderer when violated:
+- Every Markdown table MUST have a separator row of dashes immediately after
+  the header. Tables without it render as a single line of text.
+- Each row of a table MUST be on its own line. Never put multiple rows on
+  one line separated by extra pipes.
+- Use exactly one pipe \`|\` between columns; trim trailing pipes only on
+  the row terminator.
+- A correct table looks like this (note the second row of dashes):
+
+\`\`\`markdown
+| Column A | Column B | Column C |
+| --- | --- | --- |
+| value 1 | value 2 | value 3 |
+| value 4 | value 5 | value 6 |
+\`\`\`
+
+- Schedules / Gantt / week-by-week plans MUST use this same table shape, one
+  row per week (or per task), never inline.
+- Use blank lines between paragraphs, headings, and tables — no run-on
+  blocks.
 `.trim();
 
 export const SEED_PROJECT_TYPES: ProjectTypeWriteInput[] = [
@@ -597,10 +617,20 @@ Add a short paragraph after the table about the advisor (if mentioned).
         },
         agentPromptTemplate: `${SHARED_INSTRUCTION}
 
-Output two Markdown tables. The first is a materials budget with columns
-"Kalem", "Gerekçe", "Birim Maliyet", "Adet", "Toplam". The second is a
-week-by-week schedule with columns "Hafta", "Hedef", "Çıktı". Cover at
-least 8 weeks.
+Output exactly TWO separate Markdown tables, with a blank line between them
+and an "## Hafta planı" heading before the second.
+
+TABLE 1 — Malzeme Bütçesi
+Columns: "Kalem" | "Gerekçe" | "Birim Maliyet" | "Adet" | "Toplam"
+End with a row whose first column is **TOPLAM** holding the budget sum.
+
+TABLE 2 — Hafta planı
+Columns: "Hafta" | "Hedef" | "Çıktı"
+ONE row per week, at least 8 rows. Do NOT collapse multiple weeks into a
+single row.
+
+REMINDER: every table row goes on its own line, and the header row is
+followed by a separator row of dashes (\`| --- | --- | --- |\`).
 
 User idea: {{userIdea}}
 Earlier sections: {{previousSections}}
