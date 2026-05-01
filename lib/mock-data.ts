@@ -1,61 +1,7 @@
-import { Project, ProjectType } from '@/types';
-
-export const projectTypes: ProjectType[] = [
-  {
-    id: 'ka210',
-    name: 'Erasmus+ KA210',
-    description: 'Kucuk ortaklik hibe basvurusu - 30-60 bin EUR',
-    budget: '30-60 bin EUR',
-    icon: 'GraduationCap',
-    credits: 50,
-    steps: [
-      {
-        id: 'step-1',
-        order: 1,
-        title: 'Proje Ozeti ve Arka Plan',
-        description: 'Projenin genel baglamini ve cozulmek istenen sorunu aciklar.',
-        systemPromptTemplate: 'Sen bir Avrupa Birligi proje uzmanisin. Erasmus+ KA210 kriterlerine uygun bir proje ozeti yaz.',
-        userPromptTemplate: 'Asagidaki fikri temel alarak projeyi ozetle: {{user_input}}',
-        model: 'claude-sonnet-4.6',
-        requiresPreviousContext: false,
-        requiredUserInputs: [
-          { id: 'u1', label: 'Proje Fikri', type: 'textarea', required: true }
-        ],
-        estimatedCredits: 10
-      },
-      {
-        id: 'step-2',
-        order: 2,
-        title: 'Hedef Kitle ve Etki',
-        description: 'Projenin kimleri hedefledigi ve beklenen etki.',
-        systemPromptTemplate: 'Bir onceki adimdaki proje ozetine gore hedef kitle analizini Erasmus+ standartlarinda gerceklestir.',
-        userPromptTemplate: 'Lutfen hedef kitlemiz olan {{target_audience}} icin bu projenin etkilerini detaylandir.',
-        model: 'claude-sonnet-4.6',
-        requiresPreviousContext: true,
-        requiredUserInputs: [
-          { id: 'u2', label: 'Hedef Kitle (Orn: 15-18 yas ogrenciler)', type: 'text', required: true }
-        ],
-        estimatedCredits: 10
-      }
-    ]
-  },
-  {
-    id: 'tubitak-2209a',
-    name: 'TUBITAK 2209-A',
-    description: 'Universite ogrencileri arastirma projeleri',
-    budget: '15.000 TL',
-    icon: 'Microscope',
-    credits: 30,
-  },
-  {
-    id: 'kalkinma-ajansi',
-    name: 'Kalkinma Ajansi',
-    description: 'Bolgesel kalkinma ve altyapi destekleri',
-    budget: '1-5 Milyon TL',
-    icon: 'Building2',
-    credits: 100,
-  },
-];
+// Sprint 2 left only the project list as a mock to keep dashboard tables
+// populated until Sprint 3 wires the real /projects collection. Project
+// types are now read from Firestore (see lib/server/projectTypes.ts).
+import { Project } from '@/types';
 
 export const mockProjects: Project[] = [
   {
@@ -231,10 +177,3 @@ export const mockProjects: Project[] = [
   },
 ];
 
-export const userProfile = {
-  name: 'M. Hanifi ASLAN',
-  email: 'hanifi@projectmenager.com',
-  credits: 450,
-  plan: 'Standart Plan',
-  avatarUrl: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
-};

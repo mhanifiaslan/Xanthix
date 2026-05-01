@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from '@/lib/server/getServerSession';
+import { listProjectTypes } from '@/lib/server/projectTypes';
+import Sidebar from '@/components/dashboard/Sidebar';
 import DashboardLayoutClient from './layout-client';
 
 export default async function DashboardLayout({
@@ -13,5 +15,21 @@ export default async function DashboardLayout({
   const session = await getServerSession();
   if (!session) redirect(`/${locale}/login`);
 
-  return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
+  // Fetch up-front so the sidebar's "Yeni proje başla" group is populated
+  // on the server pass — no client flash of stale state.
+  const featuredTypes = await listProjectTypes({ orgIds: session.orgIds });
+  const isAdmin = session.role === 'admin' || session.role === 'super_admin';
+
+  return (
+    <DashboardLayoutClient
+      sidebar={
+        <Sidebar
+          featuredTypes={featuredTypes.slice(0, 4)}
+          isAdmin={isAdmin}
+        />
+      }
+    >
+      {children}
+    </DashboardLayoutClient>
+  );
 }

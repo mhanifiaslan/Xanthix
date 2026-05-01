@@ -1,12 +1,22 @@
 "use client";
 
 import { pricingPackages, mockPayments } from "@/lib/mock-admin";
-import { userProfile } from "@/lib/mock-data";
+import { useUserDoc } from "@/lib/hooks/useUserDoc";
 import { Wallet, TrendingDown, CheckCircle2, XCircle, RefreshCw, Download, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const PLAN_LABELS: Record<string, string> = {
+  free: "Ücretsiz Plan",
+  individual: "Bireysel Plan",
+  org_member: "Kurumsal Üye",
+};
+
 export default function BillingPage() {
+  const userDoc = useUserDoc();
+  // TODO(sprint-5): wire to real Stripe payments from Firestore.
   const myPayments = mockPayments.filter((p) => p.userId === "u1");
+  const planLabel = PLAN_LABELS[userDoc?.planType ?? "free"] ?? "Ücretsiz Plan";
+  const balance = userDoc?.tokenBalance ?? null;
 
   const statusConfig = {
     basarili: { label: "Basarili", icon: CheckCircle2, color: "text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20" },
@@ -28,14 +38,13 @@ export default function BillingPage() {
           <div className="md:col-span-2 bg-gradient-to-br from-[var(--color-accent)]/15 to-[var(--color-card)] rounded-2xl border border-[var(--color-accent)]/20 p-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-[var(--color-text-secondary)] mb-1">{userProfile.plan}</p>
+                <p className="text-sm text-[var(--color-text-secondary)] mb-1">{planLabel}</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-bold tabular-nums text-[var(--color-text-primary)]">{userProfile.credits}</span>
-                  <span className="text-lg text-[var(--color-text-secondary)]">kredi</span>
+                  <span className="text-5xl font-bold tabular-nums text-[var(--color-text-primary)]">
+                    {balance === null ? "—" : balance.toLocaleString("tr-TR")}
+                  </span>
+                  <span className="text-lg text-[var(--color-text-secondary)]">token</span>
                 </div>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-2">
-                  Ortalama gunluk tuketim: ~15 kredi · Tahminen <strong className="text-[var(--color-warning)]">30 gun</strong> yeter
-                </p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center">
                 <Wallet size={22} className="text-[var(--color-accent)]" />

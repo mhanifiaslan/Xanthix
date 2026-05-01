@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { userProfile } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { User, Shield, Sliders, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,8 @@ const tabs = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile");
+  const { user } = useAuth();
+  const initial = (user?.name ?? user?.email ?? "?").slice(0, 1).toUpperCase();
 
   return (
     <div className="min-h-full pb-12">
@@ -49,11 +51,18 @@ export default function SettingsPage() {
             <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-6">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Profil Fotografi</h2>
               <div className="flex items-center gap-4">
-                <img
-                  src={userProfile.avatarUrl}
-                  alt={userProfile.name}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-white/10"
-                />
+                {user?.photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.photoURL}
+                    alt={user.name ?? user.email ?? ""}
+                    className="w-16 h-16 rounded-full object-cover border-2 border-white/10"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/20 border-2 border-[var(--color-accent)]/30 flex items-center justify-center text-xl font-bold text-[var(--color-accent)]">
+                    {initial}
+                  </div>
+                )}
                 <div>
                   <button
                     onClick={() => console.log("Fotograf yukle")}
@@ -70,8 +79,8 @@ export default function SettingsPage() {
             <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-6 space-y-4">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4">Kisisel Bilgiler</h2>
               {[
-                { label: "Ad Soyad", value: userProfile.name, type: "text" },
-                { label: "Email", value: userProfile.email, type: "email" },
+                { label: "Ad Soyad", value: user?.name ?? "", type: "text" },
+                { label: "Email", value: user?.email ?? "", type: "email" },
                 { label: "Telefon", value: "", placeholder: "opsiyonel", type: "tel" },
                 { label: "Kurum", value: "", placeholder: "Okul, STK veya sirket", type: "text" },
               ].map((field) => (

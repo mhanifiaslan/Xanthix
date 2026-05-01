@@ -1,3 +1,6 @@
+// Project (the user's instance, not the template) — still mock until Sprint 3
+// wires the /projects collection. ProjectType lives in ./projectType.ts.
+
 export type ProjectStatus = 'taslak' | 'devam eden' | 'tamamlandi';
 
 export interface ProjectFile {
@@ -14,68 +17,6 @@ export interface ProjectSection {
   content: string;
 }
 
-export interface UserInputRequirement {
-  id: string;
-  label: string;
-  type: 'text' | 'textarea' | 'file' | 'select';
-  required: boolean;
-  options?: string[];
-}
-
-export interface DocumentReference {
-  id: string;
-  name: string;
-  url: string;
-}
-
-export interface StepOutputConfig {
-  type: 'text' | 'document';
-  format?: 'markdown' | 'json' | 'docx' | 'pdf';
-  documentTemplate?: DocumentReference;
-}
-
-export interface ProjectTypeStep {
-  id: string;
-  order: number;
-  title: string;
-  description: string;
-
-  // AI Configuration
-  systemPromptTemplate: string;
-  userPromptTemplate: string;
-  model: 'gpt-4' | 'claude-opus-4' | 'claude-sonnet-4.6' | 'gemini-2.5-pro';
-
-  // Dependencies
-  requiresPreviousContext: boolean;
-
-  // Requirements & Materials
-  requiredUserInputs: UserInputRequirement[];
-  referenceDocuments?: DocumentReference[];
-  referenceImages?: DocumentReference[];
-
-  estimatedCredits: number;
-  outputConfig?: StepOutputConfig;
-}
-
-export interface ProjectType {
-  id: string;
-  name: string;
-  description: string;
-  budget: string;
-  icon: string;
-  profitMargin?: number;
-  credits: number;
-  steps?: ProjectTypeStep[];
-}
-
-/** Sihirbaz sırasında her adımın ürettiği sonucu tutar */
-export interface StepResult {
-  stepIndex: number;
-  stepTitle: string;
-  content: string;
-  userInputs: Record<string, string>;
-}
-
 export interface Project {
   id: string;
   name: string;
@@ -90,6 +31,6 @@ export interface Project {
   teamMembers?: string[];
   files?: ProjectFile[];
   sections?: ProjectSection[];
-  /** AI sihirbazının ürettiği adım çıktıları */
-  generatedSteps?: StepResult[];
 }
+
+export type { ProjectType, Section } from './projectType';
