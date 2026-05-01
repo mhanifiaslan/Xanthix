@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -62,7 +62,6 @@ export default function ProjectView({
   const [project, setProject] = useState(initialProject);
   const [sections, setSections] = useState(initialSections);
   const [error, setError] = useState<string | null>(null);
-  const generatingRef = useRef(false);
 
   // Live subscribe to /projects/{id}
   useEffect(() => {
@@ -108,27 +107,33 @@ export default function ProjectView({
     });
   }, [projectId]);
 
-  // Auto-run the next section as long as we're still generating.
+  // Auto-run the next section while the project is still generating.
+  // Each effect mount gets its own `cancelled` token; if React unmounts and
+  // remounts (strict mode, HMR), the old loop short-circuits and the new
+  // one picks up — the server action is naturally idempotent because it
+  // re-reads currentSectionIndex on every call.
   useEffect(() => {
     if (project.status !== 'generating') return;
-    if (generatingRef.current) return;
 
     let cancelled = false;
     const run = async () => {
-      generatingRef.current = true;
-      try {
-        while (!cancelled) {
-          // Re-read latest project state from closure via setState getter.
+      while (!cancelled) {
+        try {
+          console.info('[xanthix] requesting next section…');
           const result = await generateNextSectionAction(projectId);
-          if (cancelled) break;
-          if (result.done) break;
+          if (cancelled) return;
+          console.info(
+            `[xanthix] section "${result.sectionId ?? '—'}" done; allDone=${result.done}`,
+          );
+          if (result.done) return;
+        } catch (err) {
+          if (cancelled) return;
+          const message =
+            err instanceof Error ? err.message : 'Üretim hatası';
+          console.error('[xanthix] generation failed', err);
+          setError(message);
+          return;
         }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Üretim hatası');
-        }
-      } finally {
-        generatingRef.current = false;
       }
     };
     run();
@@ -136,7 +141,6 @@ export default function ProjectView({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, project.status]);
 
   const totalSlots = useMemo(
