@@ -31,9 +31,9 @@ const MODELS: Record<ModelTag, ConcreteModel> = {
   flash: {
     tag: 'flash',
     provider: 'vertex',
-    id: 'gemini-2.0-flash',
-    costInPer1M: 0.1,
-    costOutPer1M: 0.4,
+    id: 'gemini-2.5-flash',
+    costInPer1M: 0.3,
+    costOutPer1M: 2.5,
   },
   pro: {
     tag: 'pro',
