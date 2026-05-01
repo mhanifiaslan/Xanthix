@@ -1,0 +1,89 @@
+{
+  "app": {
+    "name": "Xanthix.ai",
+    "tagline": "Yapay zekâ destekli proje ve hibe başvuru yazımı"
+  },
+  "common": {
+    "loading": "Yükleniyor…",
+    "error": "Bir şeyler ters gitti",
+    "retry": "Tekrar dene",
+    "cancel": "Vazgeç",
+    "save": "Kaydet",
+    "delete": "Sil",
+    "continue": "Devam et",
+    "back": "Geri",
+    "next": "İleri",
+    "submit": "Gönder",
+    "close": "Kapat",
+    "search": "Ara",
+    "logout": "Çıkış yap"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "projects": "Projeler",
+    "projectTypes": "Proje türleri",
+    "archive": "Arşiv",
+    "billing": "Ödeme & Krediler",
+    "settings": "Ayarlar",
+    "support": "Destek",
+    "admin": "Yönetim"
+  },
+  "auth": {
+    "login": {
+      "title": "Giriş yap",
+      "subtitle": "Tekrar hoş geldin. Devam etmek için giriş yap.",
+      "emailLabel": "E-posta",
+      "emailPlaceholder": "ornek@firma.com",
+      "passwordLabel": "Şifre",
+      "passwordPlaceholder": "Şifren",
+      "submit": "Giriş yap",
+      "googleButton": "Google ile devam et",
+      "noAccount": "Hesabın yok mu?",
+      "registerLink": "Hesap oluştur",
+      "forgotLink": "Şifremi unuttum",
+      "errors": {
+        "invalidCredentials": "E-posta veya şifre hatalı.",
+        "generic": "Giriş yapılamadı. Lütfen tekrar dene."
+      }
+    },
+    "register": {
+      "title": "Hesap oluştur",
+      "subtitle": "Dakikalar içinde daha güçlü projeler yazmaya başla.",
+      "nameLabel": "Ad Soyad",
+      "namePlaceholder": "Adın Soyadın",
+      "emailLabel": "E-posta",
+      "emailPlaceholder": "ornek@firma.com",
+      "passwordLabel": "Şifre",
+      "passwordPlaceholder": "En az 8 karakter",
+      "submit": "Hesabı oluştur",
+      "haveAccount": "Zaten hesabın var mı?",
+      "loginLink": "Giriş yap",
+      "errors": {
+        "emailInUse": "Bu e-posta ile zaten bir hesap var.",
+        "weakPassword": "Şifre çok zayıf.",
+        "generic": "Hesap oluşturulamadı. Lütfen tekrar dene."
+      }
+    },
+    "forgot": {
+      "title": "Şifreyi sıfırla",
+      "subtitle": "E-posta adresine sıfırlama bağlantısı göndereceğiz.",
+      "emailLabel": "E-posta",
+      "submit": "Sıfırlama bağlantısı gönder",
+      "backToLogin": "Girişe dön",
+      "sent": "Sıfırlama bağlantısı için gelen kutunu kontrol et."
+    },
+    "validation": {
+      "emailInvalid": "Geçerli bir e-posta gir.",
+      "passwordMin": "Şifre en az 8 karakter olmalı.",
+      "nameMin": "Ad en az 2 karakter olmalı.",
+      "required": "Bu alan zorunludur."
+    }
+  },
+  "dashboard": {
+    "welcome": "Tekrar hoş geldin, {name}",
+    "tokenBalance": "Token bakiyesi",
+    "newProject": "Yeni proje",
+    "recent": "Son projeler",
+    "empty": "Henüz bir projen yok."
+  }
+}

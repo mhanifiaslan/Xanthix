@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "firebase:emu": "firebase emulators:start --import=./.firebase-data --export-on-exit"
+    "firebase:emu": "firebase emulators:start --import=./.firebase-data --export-on-exit",
+    "admin:set-role": "node scripts/set-admin-claim.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "dotenv": "^17.4.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

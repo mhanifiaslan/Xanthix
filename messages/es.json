@@ -1,0 +1,89 @@
+{
+  "app": {
+    "name": "Xanthix.ai",
+    "tagline": "Redacción de propuestas y subvenciones con IA"
+  },
+  "common": {
+    "loading": "Cargando…",
+    "error": "Algo salió mal",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "continue": "Continuar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "submit": "Enviar",
+    "close": "Cerrar",
+    "search": "Buscar",
+    "logout": "Cerrar sesión"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "projects": "Proyectos",
+    "projectTypes": "Tipos de proyecto",
+    "archive": "Archivo",
+    "billing": "Facturación",
+    "settings": "Ajustes",
+    "support": "Soporte",
+    "admin": "Administración"
+  },
+  "auth": {
+    "login": {
+      "title": "Iniciar sesión",
+      "subtitle": "Bienvenido de nuevo. Inicia sesión para continuar.",
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "passwordLabel": "Contraseña",
+      "passwordPlaceholder": "Tu contraseña",
+      "submit": "Iniciar sesión",
+      "googleButton": "Continuar con Google",
+      "noAccount": "¿No tienes cuenta?",
+      "registerLink": "Crea una",
+      "forgotLink": "¿Olvidaste tu contraseña?",
+      "errors": {
+        "invalidCredentials": "Correo o contraseña incorrectos.",
+        "generic": "No se pudo iniciar sesión. Inténtalo de nuevo."
+      }
+    },
+    "register": {
+      "title": "Crea tu cuenta",
+      "subtitle": "Empieza a escribir mejores propuestas en minutos.",
+      "nameLabel": "Nombre completo",
+      "namePlaceholder": "Nombre y apellidos",
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "passwordLabel": "Contraseña",
+      "passwordPlaceholder": "Mínimo 8 caracteres",
+      "submit": "Crear cuenta",
+      "haveAccount": "¿Ya tienes cuenta?",
+      "loginLink": "Inicia sesión",
+      "errors": {
+        "emailInUse": "Ya existe una cuenta con este correo.",
+        "weakPassword": "La contraseña es demasiado débil.",
+        "generic": "No se pudo crear la cuenta. Inténtalo de nuevo."
+      }
+    },
+    "forgot": {
+      "title": "Restablecer contraseña",
+      "subtitle": "Te enviaremos un enlace por correo.",
+      "emailLabel": "Correo electrónico",
+      "submit": "Enviar enlace",
+      "backToLogin": "Volver a iniciar sesión",
+      "sent": "Revisa tu bandeja de entrada para el enlace."
+    },
+    "validation": {
+      "emailInvalid": "Introduce un correo válido.",
+      "passwordMin": "La contraseña debe tener al menos 8 caracteres.",
+      "nameMin": "El nombre debe tener al menos 2 caracteres.",
+      "required": "Este campo es obligatorio."
+    }
+  },
+  "dashboard": {
+    "welcome": "Bienvenido de nuevo, {name}",
+    "tokenBalance": "Saldo de tokens",
+    "newProject": "Nuevo proyecto",
+    "recent": "Proyectos recientes",
+    "empty": "Aún no tienes proyectos."
+  }
+}

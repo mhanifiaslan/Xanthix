@@ -7,7 +7,7 @@ import {
   BookOpen, Archive, BarChart2, CreditCard, Settings, MessageSquare, HelpCircle, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 const groups = [
   {
@@ -46,11 +46,11 @@ const groups = [
 
 export default function NavMenu() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
   const router = useRouter();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     router.push("/login");
   };
 

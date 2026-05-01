@@ -1,0 +1,89 @@
+{
+  "app": {
+    "name": "Xanthix.ai",
+    "tagline": "AI-powered grant & project proposal writing"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "continue": "Continue",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "close": "Close",
+    "search": "Search",
+    "logout": "Sign out"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "projectTypes": "Project types",
+    "archive": "Archive",
+    "billing": "Billing",
+    "settings": "Settings",
+    "support": "Support",
+    "admin": "Admin"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Welcome back. Sign in to continue.",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Your password",
+      "submit": "Sign in",
+      "googleButton": "Continue with Google",
+      "noAccount": "Don't have an account?",
+      "registerLink": "Create one",
+      "forgotLink": "Forgot password?",
+      "errors": {
+        "invalidCredentials": "Invalid email or password.",
+        "generic": "Could not sign in. Please try again."
+      }
+    },
+    "register": {
+      "title": "Create your account",
+      "subtitle": "Start writing better proposals in minutes.",
+      "nameLabel": "Full name",
+      "namePlaceholder": "Jane Doe",
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "At least 8 characters",
+      "submit": "Create account",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "errors": {
+        "emailInUse": "An account with this email already exists.",
+        "weakPassword": "Password is too weak.",
+        "generic": "Could not create account. Please try again."
+      }
+    },
+    "forgot": {
+      "title": "Reset password",
+      "subtitle": "We'll email you a reset link.",
+      "emailLabel": "Email",
+      "submit": "Send reset link",
+      "backToLogin": "Back to sign in",
+      "sent": "Check your inbox for the reset link."
+    },
+    "validation": {
+      "emailInvalid": "Please enter a valid email.",
+      "passwordMin": "Password must be at least 8 characters.",
+      "nameMin": "Name must be at least 2 characters.",
+      "required": "This field is required."
+    }
+  },
+  "dashboard": {
+    "welcome": "Welcome back, {name}",
+    "tokenBalance": "Token balance",
+    "newProject": "New project",
+    "recent": "Recent projects",
+    "empty": "You don't have any projects yet."
+  }
+}
