@@ -26,6 +26,7 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
     : routing.defaultLocale;
 
   if (!snap.exists) {
+    const WELCOME_BONUS = 500;
     await ref.set({
       uid: decoded.uid,
       email: decoded.email ?? null,
@@ -34,7 +35,7 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
       emailVerified: !!decoded.email_verified,
       locale: safeLocale,
       planType: 'free',
-      tokenBalance: 50, // welcome bonus
+      tokenBalance: WELCOME_BONUS,
       orgIds: [],
       createdAt: FieldValue.serverTimestamp(),
       lastLoginAt: FieldValue.serverTimestamp(),
@@ -43,8 +44,8 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
     await db.collection('tokenTransactions').add({
       userId: decoded.uid,
       type: 'bonus',
-      amount: 50,
-      balanceAfter: 50,
+      amount: WELCOME_BONUS,
+      balanceAfter: WELCOME_BONUS,
       reason: 'welcome',
       createdAt: FieldValue.serverTimestamp(),
     });
