@@ -1,7 +1,7 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, type FormEvent, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Bot, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -9,10 +9,29 @@ import { FirebaseError } from 'firebase/app';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="w-full max-w-md flex justify-center py-12">
+      <Loader2 className="animate-spin text-[var(--color-text-secondary)]" />
+    </div>
+  );
+}
+
+function LoginForm() {
   const t = useTranslations('auth.login');
   const tApp = useTranslations('app');
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const redirectTo = nextParam && nextParam.startsWith('/') ? nextParam : '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +46,8 @@ export default function LoginPage() {
     setIsPending(true);
     try {
       await signInWithEmail(email, password);
-      router.push('/');
+      router.replace(redirectTo);
+      router.refresh();
     } catch (err) {
       setError(mapAuthError(err, t));
     } finally {
@@ -40,7 +60,8 @@ export default function LoginPage() {
     setIsGooglePending(true);
     try {
       await signInWithGoogle();
-      router.push('/');
+      router.replace(redirectTo);
+      router.refresh();
     } catch (err) {
       setError(mapAuthError(err, t));
     } finally {

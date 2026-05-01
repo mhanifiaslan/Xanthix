@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -84,16 +85,27 @@ async function toAuthUser(fbUser: FirebaseUser): Promise<AuthUser> {
   };
 }
 
+/**
+ * Awaits both: server-side user provisioning + session-cookie creation.
+ * Throws when either fails so callers can show an error and avoid a redirect
+ * loop where the client believes it's signed in but the server can't tell.
+ */
+async function completeSignIn(fbUser: FirebaseUser, locale: string) {
+  const idToken = await fbUser.getIdToken(true);
+  await provisionUserAction({ idToken, locale });
+  await createSessionAction(idToken);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const locale = useLocale();
+  const localeRef = useRef(locale);
+  localeRef.current = locale;
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     initAppCheck();
-
     const auth = getFirebaseAuth();
-    const provisioned = new Set<string>();
 
     const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) {
@@ -102,27 +114,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        // Provision the Firestore user doc + open a server session cookie
-        // once per browser session.
-        if (!provisioned.has(fbUser.uid)) {
-          provisioned.add(fbUser.uid);
-          try {
-            const idToken = await fbUser.getIdToken();
-            await Promise.all([
-              provisionUserAction({ idToken, locale }),
-              createSessionAction(idToken),
-            ]);
-          } catch (e) {
-            console.warn('[auth] post-signin tasks failed', e);
-          }
-        }
         setUser(await toAuthUser(fbUser));
       } finally {
         setIsLoading(false);
       }
     });
 
-    // Refresh claims if a token rotates (e.g. after server-side claim update).
     const unsubToken = onIdTokenChanged(auth, async (fbUser) => {
       if (!fbUser) return;
       setUser(await toAuthUser(fbUser));
@@ -132,19 +129,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubAuth();
       unsubToken();
     };
-  }, [locale]);
+  }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
-    await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+    const cred = await signInWithEmailAndPassword(
+      getFirebaseAuth(),
+      email,
+      password,
+    );
+    await completeSignIn(cred.user, localeRef.current);
   }, []);
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, name: string) => {
-      const auth = getFirebaseAuth();
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(
+        getFirebaseAuth(),
+        email,
+        password,
+      );
       if (name.trim()) {
         await updateProfile(cred.user, { displayName: name.trim() });
       }
+      await completeSignIn(cred.user, localeRef.current);
     },
     [],
   );
@@ -152,7 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    await signInWithPopup(getFirebaseAuth(), provider);
+    const cred = await signInWithPopup(getFirebaseAuth(), provider);
+    await completeSignIn(cred.user, localeRef.current);
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -160,8 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await fbSignOut(getFirebaseAuth());
-    await destroySessionAction();
+    try {
+      await destroySessionAction();
+    } finally {
+      await fbSignOut(getFirebaseAuth());
+    }
   }, []);
 
   const refreshClaims = useCallback(async () => {

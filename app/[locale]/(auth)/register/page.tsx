@@ -41,7 +41,8 @@ export default function RegisterPage() {
     setIsPending(true);
     try {
       await signUpWithEmail(email, password, name);
-      router.push('/');
+      router.replace('/');
+      router.refresh();
     } catch (err) {
       setError(mapAuthError(err, t));
     } finally {
@@ -54,7 +55,8 @@ export default function RegisterPage() {
     setIsGooglePending(true);
     try {
       await signInWithGoogle();
-      router.push('/');
+      router.replace('/');
+      router.refresh();
     } catch (err) {
       setError(mapAuthError(err, t));
     } finally {

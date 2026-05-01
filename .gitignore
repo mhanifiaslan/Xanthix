@@ -50,7 +50,13 @@ firestore-debug.log
 ui-debug.log
 *.firebase-cache
 serviceAccount*.json
-firebase-adminsdk-*.json
+firebase-adminsdk*.json
+
+# Service account / credential files — NEVER commit
+.secrets/
+secrets/
+*.serviceaccount.json
+*-credentials.json
 
 # IDE
 .idea/
