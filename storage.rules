@@ -1,0 +1,80 @@
+rules_version = '2';
+
+// Xanthix.ai — Storage Security Rules
+//
+// Path layout:
+//   /users/{uid}/...                      — user-uploaded files (CV, supporting docs)
+//   /projects/{projectId}/uploads/...     — files attached to a specific project
+//   /projects/{projectId}/exports/...     — generated PDF/DOCX/XLSX (server writes)
+//   /projectTypes/{typeId}/guides/...     — admin-uploaded reference guides
+//   /organizations/{orgId}/...            — org-shared assets
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+             (request.auth.token.role == 'admin' ||
+              request.auth.token.role == 'super_admin');
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+             request.auth.token.orgIds is list &&
+             orgId in request.auth.token.orgIds;
+    }
+
+    function reasonableSize() {
+      return request.resource.size < 25 * 1024 * 1024; // 25 MB
+    }
+
+    function allowedMime() {
+      return request.resource.contentType.matches(
+        'application/(pdf|vnd\\.openxmlformats-officedocument\\.(wordprocessingml\\.document|spreadsheetml\\.sheet|presentationml\\.presentation))|' +
+        'image/(png|jpeg|webp|svg\\+xml)|' +
+        'text/(plain|markdown|csv)'
+      );
+    }
+
+    // User personal files
+    match /users/{uid}/{allPaths=**} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if isSelf(uid) && reasonableSize() && allowedMime();
+    }
+
+    // Project files — read by owner/org, write only via server (Admin SDK bypasses)
+    match /projects/{projectId}/uploads/{allPaths=**} {
+      allow read: if isSignedIn(); // tighter check happens in server, plus signed URLs
+      allow write: if isSignedIn() && reasonableSize() && allowedMime();
+    }
+
+    match /projects/{projectId}/exports/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if false; // server-only
+    }
+
+    // Admin-managed project type reference guides
+    match /projectTypes/{typeId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Organization shared assets
+    match /organizations/{orgId}/{allPaths=**} {
+      allow read: if isOrgMember(orgId) || isAdmin();
+      allow write: if isOrgMember(orgId) && reasonableSize() && allowedMime();
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

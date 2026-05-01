@@ -1,0 +1,240 @@
+import { Project, ProjectType } from '@/types';
+
+export const projectTypes: ProjectType[] = [
+  {
+    id: 'ka210',
+    name: 'Erasmus+ KA210',
+    description: 'Kucuk ortaklik hibe basvurusu - 30-60 bin EUR',
+    budget: '30-60 bin EUR',
+    icon: 'GraduationCap',
+    credits: 50,
+    steps: [
+      {
+        id: 'step-1',
+        order: 1,
+        title: 'Proje Ozeti ve Arka Plan',
+        description: 'Projenin genel baglamini ve cozulmek istenen sorunu aciklar.',
+        systemPromptTemplate: 'Sen bir Avrupa Birligi proje uzmanisin. Erasmus+ KA210 kriterlerine uygun bir proje ozeti yaz.',
+        userPromptTemplate: 'Asagidaki fikri temel alarak projeyi ozetle: {{user_input}}',
+        model: 'claude-sonnet-4.6',
+        requiresPreviousContext: false,
+        requiredUserInputs: [
+          { id: 'u1', label: 'Proje Fikri', type: 'textarea', required: true }
+        ],
+        estimatedCredits: 10
+      },
+      {
+        id: 'step-2',
+        order: 2,
+        title: 'Hedef Kitle ve Etki',
+        description: 'Projenin kimleri hedefledigi ve beklenen etki.',
+        systemPromptTemplate: 'Bir onceki adimdaki proje ozetine gore hedef kitle analizini Erasmus+ standartlarinda gerceklestir.',
+        userPromptTemplate: 'Lutfen hedef kitlemiz olan {{target_audience}} icin bu projenin etkilerini detaylandir.',
+        model: 'claude-sonnet-4.6',
+        requiresPreviousContext: true,
+        requiredUserInputs: [
+          { id: 'u2', label: 'Hedef Kitle (Orn: 15-18 yas ogrenciler)', type: 'text', required: true }
+        ],
+        estimatedCredits: 10
+      }
+    ]
+  },
+  {
+    id: 'tubitak-2209a',
+    name: 'TUBITAK 2209-A',
+    description: 'Universite ogrencileri arastirma projeleri',
+    budget: '15.000 TL',
+    icon: 'Microscope',
+    credits: 30,
+  },
+  {
+    id: 'kalkinma-ajansi',
+    name: 'Kalkinma Ajansi',
+    description: 'Bolgesel kalkinma ve altyapi destekleri',
+    budget: '1-5 Milyon TL',
+    icon: 'Building2',
+    credits: 100,
+  },
+];
+
+export const mockProjects: Project[] = [
+  {
+    id: 'p1',
+    name: 'Lise Ogrencileri icin Iklim Degisikligi Bilinci (KA210)',
+    typeId: 'ka210',
+    type: 'Erasmus+ KA210',
+    status: 'devam eden',
+    progress: 65,
+    lastModified: '2 saat once',
+    budget: '45.000 EUR',
+    deadline: '2025-09-30',
+    summary: 'Bu proje, Turkiye, Polonya ve Ispanya\'daki lise ogrencilerini iklim degisikliginin sonuclari ve cozum yollari konusunda bilinclendirmeyi hedeflemektedir. Ortak etkinlikler, ogrenci hareketlilikleri ve dijital icerik uretimi ile yurutulecektir.',
+    teamMembers: ['M. Hanifi ASLAN', 'Ayse Kaya', 'Mehmet Demir', 'Ana Garcia'],
+    files: [
+      { id: 'f1', name: 'Basvuru Formu.pdf', type: 'pdf', size: '2.4 MB', updatedAt: '2 saat once' },
+      { id: 'f2', name: 'Proje Butce Plani.xlsx', type: 'xlsx', size: '890 KB', updatedAt: '1 gun once' },
+      { id: 'f3', name: 'Etkinlik Takvimi.docx', type: 'docx', size: '540 KB', updatedAt: '3 gun once' },
+      { id: 'f4', name: 'Ortak Anlasmasi.pdf', type: 'pdf', size: '1.1 MB', updatedAt: '1 hafta once' },
+    ],
+    sections: [
+      { id: 's1', title: 'Proje Ozeti', content: 'Bu proje, Turkiye, Polonya ve Ispanya\'daki lise ogrencilerini iklim degisikliginin sonuclari ve cozum yollari konusunda bilinclendirmeyi hedeflemektedir.' },
+      { id: 's2', title: 'Hedef Kitle', content: '14-18 yas arasi lise ogrencileri, ogretmenler ve okul yoneticileri.' },
+      { id: 's3', title: 'Beklenen Ciktilar', content: '1. Cevrimici platform\n2. Egitim materyalleri seti\n3. 3 ulkede gerceklestirilen 6 ortak etkinlik\n4. Belgesel film' },
+      { id: 's4', title: 'Butce Dagilimi', content: 'Proje yonetimi: 8.000 EUR\nHareketlilik aktiviteleri: 25.000 EUR\nEgitim materyalleri: 7.000 EUR\nYayim ve dagitim: 5.000 EUR' },
+    ],
+  },
+  {
+    id: 'p2',
+    name: 'Makine Ogrenmesi ile Anomali Tespiti (2209-A)',
+    typeId: 'tubitak-2209a',
+    type: 'TUBITAK 2209-A',
+    status: 'taslak',
+    progress: 30,
+    lastModified: '5 saat once',
+    budget: '15.000 TL',
+    deadline: '2025-06-15',
+    summary: 'Endustriyel sensor verilerinde makine ogrenmesi algoritmalari kullanarak gercek zamanli anomali tespiti yapan bir sistem gelistirilmesi amaclanmaktadir.',
+    teamMembers: ['M. Hanifi ASLAN', 'Prof. Dr. Ahmet Yildiz'],
+    files: [
+      { id: 'f5', name: 'Arastirma Onerisi.docx', type: 'docx', size: '1.2 MB', updatedAt: '5 saat once' },
+      { id: 'f6', name: 'Literatur Taramasi.pdf', type: 'pdf', size: '3.7 MB', updatedAt: '2 gun once' },
+    ],
+    sections: [
+      { id: 's5', title: 'Arastirma Sorusu', content: 'Endustriyel IoT sensorlerinden gelen zaman serisi verilerinde derin ogrenme modelleri kullanilarak anomaliler gercek zamanli nasil tespit edilebilir?' },
+      { id: 's6', title: 'Yontem', content: 'LSTM tabanli otoenkoder mimarisinin egitimi ve test edilmesi planlanmaktadir. Veri seti olarak UCI Machine Learning Repository\'deki kamu veri kumeleri kullanilacaktir.' },
+      { id: 's7', title: 'Beklenen Katkilar', content: 'Endustri 4.0 kapsaminda ongorucü bakim uygulamalarina katki, 2 ulusal konferans bildirisi ve 1 hakemli dergi makalesi.' },
+    ],
+  },
+  {
+    id: 'p3',
+    name: 'Kadin Kooperatifleri Dijital Donusum (Kalkinma Ajansi)',
+    typeId: 'kalkinma-ajansi',
+    type: 'Kalkinma Ajansi',
+    status: 'tamamlandi',
+    progress: 100,
+    lastModified: '1 gun once',
+    budget: '2.500.000 TL',
+    deadline: '2024-12-31',
+    summary: 'Bolgedeki kadin kooperatiflerinin dijital pazarlama, e-ticaret ve dijital finans konularinda kapasitelerini artirarak ekonomik guclenmelrini destekleyen kapsamli bir donusum projesi.',
+    teamMembers: ['M. Hanifi ASLAN', 'Fatma Sahin', 'Zeynep Arslan', 'Koordinator: Muge Celik'],
+    files: [
+      { id: 'f7', name: 'Final Raporu.pdf', type: 'pdf', size: '8.2 MB', updatedAt: '1 gun once' },
+      { id: 'f8', name: 'Faydalanici Listesi.xlsx', type: 'xlsx', size: '445 KB', updatedAt: '1 gun once' },
+      { id: 'f9', name: 'Etki Analizi.pdf', type: 'pdf', size: '5.1 MB', updatedAt: '3 gun once' },
+      { id: 'f10', name: 'Sunum.pptx', type: 'pptx', size: '12.4 MB', updatedAt: '1 hafta once' },
+    ],
+    sections: [
+      { id: 's8', title: 'Proje Ozeti', content: 'Proje, bolgedeki 12 kadin kooperatifini kapsayan ve 340 faydalaniciya ulasan kapsamli bir dijital donusum girisimdir.' },
+      { id: 's9', title: 'Gerceklestirilen Faaliyetler', content: '1. E-ticaret egitimleri (120 kisi)\n2. Sosyal medya yonetimi atolyeleri (180 kisi)\n3. Dijital muhasebe sistemi kurulumu (12 kooperatif)\n4. Mentorluk programi (40 kisi)' },
+      { id: 's10', title: 'Elde Edilen Sonuclar', content: 'Faydalanicilarin yuzde 85\'i dijital satis kanallari olusturdu. Ortalama gelirde yuzde 34 artis gozlemlendi.' },
+    ],
+  },
+  {
+    id: 'p4',
+    name: 'Gencler icin Avrupa Firsatlari',
+    typeId: 'ka210',
+    type: 'Erasmus+ KA210',
+    status: 'taslak',
+    progress: 15,
+    lastModified: '3 gun once',
+    budget: '30.000 EUR',
+    deadline: '2025-12-01',
+    summary: 'Turk genclerine Avrupa\'daki egitim, staj ve gonulluluk firsatlarini tanitarak bilgi ve danismanlik agi olusturulmasi projesi.',
+    teamMembers: ['M. Hanifi ASLAN', 'Burak Yilmaz'],
+    files: [
+      { id: 'f11', name: 'Taslak Basvuru.docx', type: 'docx', size: '980 KB', updatedAt: '3 gun once' },
+    ],
+    sections: [
+      { id: 's11', title: 'Proje Fikri', content: 'Turkiye\'nin 5 farkli ilindeki genclik merkezleri ile Avrupa\'daki 3 ortak kurulusla bilgi paylasimi agi kurulmasi planlanmaktadir.' },
+    ],
+  },
+  {
+    id: 'p5',
+    name: 'Akilli Tarim IHA Sistemi Tasarimi',
+    typeId: 'tubitak-2209a',
+    type: 'TUBITAK 2209-A',
+    status: 'devam eden',
+    progress: 80,
+    lastModified: '4 gun once',
+    budget: '15.000 TL',
+    deadline: '2025-05-30',
+    summary: 'Insansiz hava araclari (IHA) ve bilgisayarli goru algoritmalari kullanarak tarim arazilerinde bitki hastaliklarinin erken tespitine yonelik sistem gelistirilmesi.',
+    teamMembers: ['M. Hanifi ASLAN', 'Doc. Dr. Serkan Oz', 'Hasan Demirtas'],
+    files: [
+      { id: 'f12', name: 'Sistem Tasarimi.pdf', type: 'pdf', size: '4.5 MB', updatedAt: '4 gun once' },
+      { id: 'f13', name: 'Test Sonuclari.xlsx', type: 'xlsx', size: '1.8 MB', updatedAt: '1 hafta once' },
+      { id: 'f14', name: 'Ara Rapor.docx', type: 'docx', size: '2.3 MB', updatedAt: '2 hafta once' },
+    ],
+    sections: [
+      { id: 's12', title: 'Sistem Mimarisi', content: 'DJI Phantom 4 Pro platformu uzerine entegre edilen multispektral kamera sistemi ve YOLOv8 tabanli nesne tespiti modeli kullanilmaktadir.' },
+      { id: 's13', title: 'Test Sonuclari', content: 'Farkli hastalik turleri icin ortalama tespit dogrulugu: yuzde 91.4. Gercek zamanli isleme hizi: 15 kare/saniye.' },
+    ],
+  },
+  {
+    id: 'p6',
+    name: 'Yenilenebilir Enerji Mesleki Egitim Merkezi',
+    typeId: 'kalkinma-ajansi',
+    type: 'Kalkinma Ajansi',
+    status: 'devam eden',
+    progress: 45,
+    lastModified: '1 hafta once',
+    budget: '4.200.000 TL',
+    deadline: '2026-03-15',
+    summary: 'Bolgede gunes enerjisi, ruzgar enerjisi ve enerji depolama teknolojileri konularinda meslek sahibi olacak teknisyenler yetistirmek icin altyapi ve egitim programi kurulumu.',
+    teamMembers: ['M. Hanifi ASLAN', 'Muhendis: Tolga Avci', 'Uzman: Neslihan Polat'],
+    files: [
+      { id: 'f15', name: 'Fizibilite Raporu.pdf', type: 'pdf', size: '6.1 MB', updatedAt: '1 hafta once' },
+      { id: 'f16', name: 'Mufredat Taslagi.docx', type: 'docx', size: '1.9 MB', updatedAt: '2 hafta once' },
+    ],
+    sections: [
+      { id: 's14', title: 'Merkez Kapasitesi', content: 'Proje tamamlandiginda yillik 500 kursiyere teorik ve uygulamali egitim verecek kapasitede bir merkez kurulmus olacaktir.' },
+    ],
+  },
+  {
+    id: 'p7',
+    name: 'Kirsal Kesimde Ingilizce Dil Ogrenimi',
+    typeId: 'ka210',
+    type: 'Erasmus+ KA210',
+    status: 'tamamlandi',
+    progress: 100,
+    lastModified: '2 hafta once',
+    budget: '35.000 EUR',
+    deadline: '2024-11-30',
+    summary: 'Kirsal kesimdeki okullarda Ingilizce egitimini yenilikci dijital araclar ve Avrupa ortaklariyla ortak gelistirilmis materyallerle guclendiren proje.',
+    teamMembers: ['M. Hanifi ASLAN', 'Dilek Koc', 'James Wilson'],
+    files: [
+      { id: 'f17', name: 'Proje Kapanis Raporu.pdf', type: 'pdf', size: '5.5 MB', updatedAt: '2 hafta once' },
+      { id: 'f18', name: 'Egitim Materyalleri Paketi.pdf', type: 'pdf', size: '22.3 MB', updatedAt: '3 hafta once' },
+    ],
+    sections: [
+      { id: 's15', title: 'Proje Sonuclari', content: '320 ogrenci projeye dahil edildi. Uygulanan on-son testlerde ogrencilerin dil yetkinliginde ortalama 2.3 CEFR seviyesi artis gozlemlendi.' },
+    ],
+  },
+  {
+    id: 'p8',
+    name: 'Derin Ogrenme Tabanli Hastalik Teshisi',
+    typeId: 'tubitak-2209a',
+    type: 'TUBITAK 2209-A',
+    status: 'taslak',
+    progress: 5,
+    lastModified: '1 ay once',
+    budget: '15.000 TL',
+    deadline: '2026-01-15',
+    summary: 'Medikal goruntularden derin ogrenme yontemleriyle hastaliklarin erken ve yuksek dogrulukla teshis edilmesini saglayan bir yapay zeka modeli gelistirme projesi.',
+    teamMembers: ['M. Hanifi ASLAN'],
+    files: [
+      { id: 'f19', name: 'On Calisma Notu.docx', type: 'docx', size: '310 KB', updatedAt: '1 ay once' },
+    ],
+    sections: [
+      { id: 's16', title: 'Arastirma Motivasyonu', content: 'Turkiye\'de erken teshis ile tedavi edilebilir hastaliklarin gec teshis orani hala kritik seviyelerdedir. Bu proje, bu soruna yapay zeka destekli bir cozum sunmayi hedeflemektedir.' },
+    ],
+  },
+];
+
+export const userProfile = {
+  name: 'M. Hanifi ASLAN',
+  email: 'hanifi@projectmenager.com',
+  credits: 450,
+  plan: 'Standart Plan',
+  avatarUrl: 'https://i.pravatar.cc/150?u=a042581f4e29026704d',
+};

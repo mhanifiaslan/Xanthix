@@ -1,0 +1,151 @@
+rules_version = '2';
+
+// Xanthix.ai — Firestore Security Rules
+//
+// Strategy:
+//   - Default deny everywhere; explicitly allow per collection.
+//   - Server-side Admin SDK (Cloud Functions / Next.js server) bypasses rules
+//     entirely, so user-facing reads/writes here must be conservative.
+//   - Multi-tenant model: a user belongs to themselves and optionally to one
+//     or more organizations. Org membership is checked via a member doc.
+//   - Most mutations (creating projects, spending tokens, generating sections)
+//     go through server endpoints, NOT client writes. Rules below default to
+//     read-mostly for clients.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers --------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() &&
+             request.auth.token.role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin') || hasRole('super_admin');
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function orgRoleOf(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function isOrgAdmin(orgId) {
+      return isOrgMember(orgId) &&
+             (orgRoleOf(orgId) == 'owner' || orgRoleOf(orgId) == 'admin');
+    }
+
+    // ---- Users ----------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      // user profile create happens server-side after signup; allow update
+      // of safe fields by the user themselves.
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid)
+                    && request.resource.data.diff(resource.data)
+                       .changedKeys()
+                       .hasOnly(['name', 'photoURL', 'locale', 'updatedAt', 'preferences']);
+      allow delete: if false; // soft-delete only, server-side
+    }
+
+    // ---- Organizations --------------------------------------------------
+    match /organizations/{orgId} {
+      allow read: if isOrgMember(orgId) || isAdmin();
+      allow create, update, delete: if false; // server-side only
+
+      match /members/{uid} {
+        allow read: if isOrgMember(orgId) || isAdmin();
+        allow create, update, delete: if false; // server-side only
+      }
+
+      match /invitations/{inviteId} {
+        allow read: if isOrgAdmin(orgId) || isAdmin();
+        allow create, update, delete: if false;
+      }
+    }
+
+    // ---- Project Types (templates defined by admins) -------------------
+    match /projectTypes/{typeId} {
+      allow read: if isSignedIn() &&
+                    (resource.data.visibility == 'public' ||
+                     (resource.data.visibility == 'org_only' &&
+                      resource.data.allowedOrgIds is list &&
+                      resource.data.allowedOrgIds.hasAny(getUserOrgIds())));
+      allow write: if isAdmin();
+    }
+
+    // The user's allowed org ids (best-effort; optimization later via custom claims).
+    function getUserOrgIds() {
+      return isSignedIn() && request.auth.token.orgIds is list
+             ? request.auth.token.orgIds
+             : [];
+    }
+
+    // ---- Projects -------------------------------------------------------
+    match /projects/{projectId} {
+      allow read: if isSignedIn() &&
+                    (resource.data.ownerUid == request.auth.uid ||
+                     (resource.data.orgId != null && isOrgMember(resource.data.orgId)) ||
+                     isAdmin());
+      // creation is mediated by server (token deduction etc.)
+      allow create, update, delete: if false;
+
+      match /sections/{sectionId} {
+        allow read: if isSignedIn() &&
+                      (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid ||
+                       (get(/databases/$(database)/documents/projects/$(projectId)).data.orgId != null &&
+                        isOrgMember(get(/databases/$(database)/documents/projects/$(projectId)).data.orgId)) ||
+                       isAdmin());
+        allow write: if false; // server-side only
+      }
+
+      match /messages/{msgId} {
+        allow read: if isSignedIn() &&
+                      get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        // Users may post their own chat messages; assistant messages are written server-side.
+        allow create: if isSignedIn() &&
+                        request.resource.data.role == 'user' &&
+                        get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+
+      match /exports/{exportId} {
+        allow read: if isSignedIn() &&
+                      (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid == request.auth.uid ||
+                       isAdmin());
+        allow write: if false;
+      }
+    }
+
+    // ---- Token transactions (read-only for users) ----------------------
+    match /tokenTransactions/{txId} {
+      allow read: if isSignedIn() &&
+                    (resource.data.userId == request.auth.uid ||
+                     (resource.data.orgId != null && isOrgMember(resource.data.orgId)) ||
+                     isAdmin());
+      allow write: if false;
+    }
+
+    // ---- Audit logs (admin only) ---------------------------------------
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---- Default deny --------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
