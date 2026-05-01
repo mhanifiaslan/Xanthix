@@ -1,0 +1,150 @@
+import 'server-only';
+
+import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
+import type { ModelOverride, ProjectTier } from '@/types/projectType';
+
+// -----------------------------------------------------------------------------
+// AI router
+//
+// Picks a concrete model based on (project tier × per-section override) and
+// runs the prompt against it. Returns text + token accounting so callers can
+// charge the user fairly.
+//
+// Sprint 3.0 supports Gemini only. The Anthropic path is wired so future
+// `sonnet`/`opus` overrides can light up by setting ANTHROPIC_API_KEY.
+// -----------------------------------------------------------------------------
+
+export type ModelTag = 'flash' | 'pro' | 'sonnet' | 'opus';
+
+interface ConcreteModel {
+  tag: ModelTag;
+  provider: 'gemini' | 'anthropic';
+  /** Resolved model identifier — what we actually pass to the SDK. */
+  id: string;
+  /** Cost per 1M input tokens in USD (rough — used for PaiToken accounting). */
+  costInPer1M: number;
+  /** Cost per 1M output tokens in USD. */
+  costOutPer1M: number;
+}
+
+const MODELS: Record<ModelTag, ConcreteModel> = {
+  flash: {
+    tag: 'flash',
+    provider: 'gemini',
+    id: 'gemini-2.0-flash',
+    costInPer1M: 0.1,
+    costOutPer1M: 0.4,
+  },
+  pro: {
+    tag: 'pro',
+    provider: 'gemini',
+    id: 'gemini-2.5-pro',
+    costInPer1M: 1.25,
+    costOutPer1M: 5.0,
+  },
+  sonnet: {
+    tag: 'sonnet',
+    provider: 'anthropic',
+    id: 'claude-sonnet-4-6',
+    costInPer1M: 3.0,
+    costOutPer1M: 15.0,
+  },
+  opus: {
+    tag: 'opus',
+    provider: 'anthropic',
+    id: 'claude-opus-4-7',
+    costInPer1M: 15.0,
+    costOutPer1M: 75.0,
+  },
+};
+
+const TIER_DEFAULT: Record<ProjectTier, ModelTag> = {
+  economy: 'flash',
+  standard: 'pro',
+  premium: 'sonnet',
+  enterprise: 'opus',
+};
+
+export function pickModel(opts: {
+  tier: ProjectTier;
+  override?: ModelOverride;
+}): ConcreteModel {
+  const tag = opts.override ?? TIER_DEFAULT[opts.tier];
+  return MODELS[tag];
+}
+
+export interface RunPromptInput {
+  model: ConcreteModel;
+  systemPrompt?: string;
+  userPrompt: string;
+  outputLanguage: string;
+  maxOutputTokens?: number;
+}
+
+export interface RunPromptResult {
+  text: string;
+  tokensIn: number;
+  tokensOut: number;
+  durationMs: number;
+  modelId: string;
+}
+
+export async function runPrompt(input: RunPromptInput): Promise<RunPromptResult> {
+  const t0 = Date.now();
+  if (input.model.provider === 'gemini') {
+    return runGemini(input, t0);
+  }
+  // Anthropic path is intentionally minimal until Sprint 3.1.
+  throw new Error(
+    `Provider "${input.model.provider}" not yet wired. Falling back to "pro" or set ANTHROPIC_API_KEY and rebuild.`,
+  );
+}
+
+async function runGemini(input: RunPromptInput, t0: number): Promise<RunPromptResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not set');
+  }
+
+  const ai = new GoogleGenerativeAI(apiKey);
+  const model: GenerativeModel = ai.getGenerativeModel({
+    model: input.model.id,
+    systemInstruction: input.systemPrompt
+      ? { role: 'system', parts: [{ text: input.systemPrompt }] }
+      : undefined,
+    generationConfig: {
+      temperature: 0.5,
+      topP: 0.95,
+      maxOutputTokens: input.maxOutputTokens ?? 8192,
+    },
+  });
+
+  const res = await model.generateContent(input.userPrompt);
+  const text = res.response.text();
+  const usage = res.response.usageMetadata;
+
+  return {
+    text,
+    tokensIn: usage?.promptTokenCount ?? 0,
+    tokensOut: usage?.candidatesTokenCount ?? 0,
+    durationMs: Date.now() - t0,
+    modelId: input.model.id,
+  };
+}
+
+/**
+ * Convert raw model token counts to "PaiTokens" — our internal billing unit.
+ * 1 PaiToken ≈ ~$0.001 USD with a 30% markup. Floor of 1 per call so even
+ * trivial generations have a measurable cost.
+ */
+export function paiTokensFor(opts: {
+  model: ConcreteModel;
+  tokensIn: number;
+  tokensOut: number;
+}): number {
+  const usd =
+    (opts.tokensIn / 1_000_000) * opts.model.costInPer1M +
+    (opts.tokensOut / 1_000_000) * opts.model.costOutPer1M;
+  const withMarkup = usd * 1.3;
+  return Math.max(1, Math.ceil(withMarkup * 1000));
+}

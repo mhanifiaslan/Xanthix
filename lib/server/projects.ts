@@ -1,0 +1,282 @@
+import 'server-only';
+import { FieldValue, type Firestore, type Timestamp } from 'firebase-admin/firestore';
+import { nanoid } from 'nanoid';
+import { getAdminFirestore } from '@/lib/firebase/admin';
+import {
+  type ProjectDoc,
+  type SectionDoc,
+  projectDocSchema,
+  sectionDocSchema,
+} from '@/types/project';
+
+function db(): Firestore {
+  return getAdminFirestore();
+}
+
+function isoFromTs(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  const ts = value as Timestamp;
+  return typeof ts.toDate === 'function' ? ts.toDate().toISOString() : undefined;
+}
+
+function toProjectDoc(snap: FirebaseFirestore.DocumentSnapshot): ProjectDoc | null {
+  const data = snap.data();
+  if (!data) return null;
+  const parsed = projectDocSchema.safeParse({
+    ...data,
+    id: snap.id,
+    createdAt: isoFromTs(data.createdAt),
+    updatedAt: isoFromTs(data.updatedAt),
+  });
+  if (!parsed.success) {
+    console.warn(
+      `[projects] doc ${snap.id} failed validation`,
+      parsed.error.issues.slice(0, 3),
+    );
+    return null;
+  }
+  return parsed.data;
+}
+
+function toSectionDoc(snap: FirebaseFirestore.DocumentSnapshot): SectionDoc | null {
+  const data = snap.data();
+  if (!data) return null;
+  const parsed = sectionDocSchema.safeParse({
+    ...data,
+    id: snap.id,
+    createdAt: isoFromTs(data.createdAt),
+    updatedAt: isoFromTs(data.updatedAt),
+  });
+  if (!parsed.success) return null;
+  return parsed.data;
+}
+
+// ----- Reads ----------------------------------------------------------------
+
+export async function getProjectDoc(projectId: string): Promise<ProjectDoc | null> {
+  const snap = await db().collection('projects').doc(projectId).get();
+  return toProjectDoc(snap);
+}
+
+export async function listProjectsByOwner(uid: string): Promise<ProjectDoc[]> {
+  const snap = await db()
+    .collection('projects')
+    .where('ownerUid', '==', uid)
+    .orderBy('updatedAt', 'desc')
+    .limit(50)
+    .get();
+  return snap.docs.map(toProjectDoc).filter((p): p is ProjectDoc => p !== null);
+}
+
+export async function listSectionsByProject(projectId: string): Promise<SectionDoc[]> {
+  const snap = await db()
+    .collection('projects')
+    .doc(projectId)
+    .collection('sections')
+    .orderBy('order', 'asc')
+    .get();
+  return snap.docs.map(toSectionDoc).filter((s): s is SectionDoc => s !== null);
+}
+
+// ----- Project lifecycle ----------------------------------------------------
+
+export interface CreateProjectInput {
+  ownerUid: string;
+  orgId: string | null;
+  projectTypeId: string;
+  projectTypeSlug: string;
+  totalSections: number;
+  outputLanguage: 'tr' | 'en' | 'es' | 'auto';
+  title: string;
+  idea: string;
+  userInputs?: Record<string, Record<string, string | number | boolean | null>>;
+}
+
+export async function createProjectDoc(input: CreateProjectInput): Promise<string> {
+  const id = nanoid(14);
+  const now = FieldValue.serverTimestamp();
+
+  const ref = db().collection('projects').doc(id);
+  await ref.set({
+    ownerUid: input.ownerUid,
+    orgId: input.orgId,
+    projectTypeId: input.projectTypeId,
+    projectTypeSlug: input.projectTypeSlug,
+    title: input.title,
+    idea: input.idea,
+    outputLanguage: input.outputLanguage,
+    status: 'generating' as const,
+    currentSectionIndex: 0,
+    totalSections: input.totalSections,
+    userInputs: input.userInputs ?? {},
+    tokensSpent: 0,
+    failureReason: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // Seed the first chat message so the project view always has context.
+  await ref.collection('messages').doc('m_seed').set({
+    role: 'user' as const,
+    content: input.idea,
+    sectionId: null,
+    createdAt: now,
+  });
+
+  return id;
+}
+
+export interface RecordGeneratedSectionInput {
+  projectId: string;
+  sectionId: string;
+  order: number;
+  title: string;
+  content: string;
+  outputType: string;
+  generationMeta: NonNullable<SectionDoc['generationMeta']>;
+}
+
+export async function recordGeneratedSection(
+  input: RecordGeneratedSectionInput,
+): Promise<void> {
+  const now = FieldValue.serverTimestamp();
+  const projectRef = db().collection('projects').doc(input.projectId);
+  const sectionRef = projectRef.collection('sections').doc(input.sectionId);
+
+  await db().runTransaction(async (tx) => {
+    const projectSnap = await tx.get(projectRef);
+    if (!projectSnap.exists) throw new Error('Project not found');
+
+    tx.set(sectionRef, {
+      order: input.order,
+      status: 'ready' as const,
+      title: input.title,
+      content: input.content,
+      outputType: input.outputType,
+      generationMeta: input.generationMeta,
+      failureReason: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const total = projectSnap.data()?.totalSections ?? 0;
+    const nextIndex = input.order + 1;
+    const allDone = nextIndex >= total;
+
+    tx.update(projectRef, {
+      currentSectionIndex: allDone ? total : nextIndex,
+      status: allDone ? 'ready' : 'generating',
+      tokensSpent: FieldValue.increment(input.generationMeta.paiTokensCharged),
+      updatedAt: now,
+    });
+  });
+}
+
+export async function markSectionFailed(
+  projectId: string,
+  sectionId: string,
+  order: number,
+  title: string,
+  reason: string,
+): Promise<void> {
+  const now = FieldValue.serverTimestamp();
+  const projectRef = db().collection('projects').doc(projectId);
+  await projectRef.collection('sections').doc(sectionId).set(
+    {
+      order,
+      title,
+      status: 'failed' as const,
+      content: '',
+      outputType: 'markdown',
+      generationMeta: null,
+      failureReason: reason,
+      createdAt: now,
+      updatedAt: now,
+    },
+    { merge: true },
+  );
+  await projectRef.update({
+    status: 'failed' as const,
+    failureReason: reason,
+    updatedAt: now,
+  });
+}
+
+// ----- Token wallet ---------------------------------------------------------
+
+export class InsufficientTokensError extends Error {
+  constructor(public balance: number, public required: number) {
+    super(`Insufficient tokens: balance=${balance}, required=${required}`);
+  }
+}
+
+/**
+ * Atomically debits the user's token wallet and writes a ledger entry.
+ * Throws `InsufficientTokensError` when the balance can't cover the spend.
+ */
+export async function spendTokens(opts: {
+  userId: string;
+  orgId?: string | null;
+  amount: number;
+  reason: string;
+  relatedProjectId?: string;
+  relatedSectionId?: string;
+}): Promise<{ balanceAfter: number }> {
+  if (opts.amount < 0) throw new Error('amount must be non-negative');
+
+  const firestore = db();
+  const userRef = firestore.collection('users').doc(opts.userId);
+  const txRef = firestore.collection('tokenTransactions').doc();
+
+  const balanceAfter = await firestore.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const balance = (snap.data()?.tokenBalance as number | undefined) ?? 0;
+    if (balance < opts.amount) {
+      throw new InsufficientTokensError(balance, opts.amount);
+    }
+    const next = balance - opts.amount;
+    tx.update(userRef, {
+      tokenBalance: next,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(txRef, {
+      userId: opts.userId,
+      orgId: opts.orgId ?? null,
+      type: 'spend' as const,
+      amount: opts.amount,
+      balanceAfter: next,
+      reason: opts.reason,
+      relatedProjectId: opts.relatedProjectId ?? null,
+      relatedSectionId: opts.relatedSectionId ?? null,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return next;
+  });
+
+  return { balanceAfter };
+}
+
+export async function getTokenBalance(userId: string): Promise<number> {
+  const snap = await db().collection('users').doc(userId).get();
+  return (snap.data()?.tokenBalance as number | undefined) ?? 0;
+}
+
+// ----- Messages -------------------------------------------------------------
+
+export async function appendAssistantMessage(
+  projectId: string,
+  sectionId: string,
+  content: string,
+): Promise<void> {
+  await db()
+    .collection('projects')
+    .doc(projectId)
+    .collection('messages')
+    .add({
+      role: 'assistant',
+      content,
+      sectionId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+}
