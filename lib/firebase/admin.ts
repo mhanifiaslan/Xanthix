@@ -73,7 +73,13 @@ export function getAdminAuth(): Auth {
 
 export function getAdminFirestore(): Firestore {
   if (_firestore) return _firestore;
-  _firestore = getFirestore(getOrInitAdminApp());
+  const app = getOrInitAdminApp();
+  const dbId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
+  // Admin SDK defaults to "(default)". Pass the explicit name only when the
+  // project uses a named Firestore database.
+  _firestore = dbId && dbId !== '(default)'
+    ? getFirestore(app, dbId)
+    : getFirestore(app);
   return _firestore;
 }
 

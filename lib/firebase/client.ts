@@ -62,14 +62,20 @@ export function getFirebaseAuth(): Auth {
 export function getFirebaseFirestore(): Firestore {
   if (_firestore) return _firestore;
   const app = getOrInitApp();
+  const dbId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
+  const useNamedDb = !!dbId && dbId !== '(default)';
   if (typeof window !== 'undefined') {
-    _firestore = initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    });
+    _firestore = initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      },
+      useNamedDb ? dbId : undefined,
+    );
   } else {
-    _firestore = getFirestore(app);
+    _firestore = useNamedDb ? getFirestore(app, dbId!) : getFirestore(app);
   }
   if (useEmulator && !_emulatorWired) {
     connectFirestoreEmulator(_firestore, '127.0.0.1', 8080);
