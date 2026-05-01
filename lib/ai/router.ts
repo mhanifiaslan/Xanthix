@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { GoogleGenerativeAI, type GenerativeModel } from '@google/generative-ai';
 import type { ModelOverride, ProjectTier } from '@/types/projectType';
+import { getVertexClient } from '@/lib/ai/vertex';
 
 // -----------------------------------------------------------------------------
 // AI router
@@ -18,7 +18,7 @@ export type ModelTag = 'flash' | 'pro' | 'sonnet' | 'opus';
 
 interface ConcreteModel {
   tag: ModelTag;
-  provider: 'gemini' | 'anthropic';
+  provider: 'vertex' | 'anthropic';
   /** Resolved model identifier — what we actually pass to the SDK. */
   id: string;
   /** Cost per 1M input tokens in USD (rough — used for PaiToken accounting). */
@@ -30,14 +30,14 @@ interface ConcreteModel {
 const MODELS: Record<ModelTag, ConcreteModel> = {
   flash: {
     tag: 'flash',
-    provider: 'gemini',
+    provider: 'vertex',
     id: 'gemini-2.0-flash',
     costInPer1M: 0.1,
     costOutPer1M: 0.4,
   },
   pro: {
     tag: 'pro',
-    provider: 'gemini',
+    provider: 'vertex',
     id: 'gemini-2.5-pro',
     costInPer1M: 1.25,
     costOutPer1M: 5.0,
@@ -91,23 +91,19 @@ export interface RunPromptResult {
 
 export async function runPrompt(input: RunPromptInput): Promise<RunPromptResult> {
   const t0 = Date.now();
-  if (input.model.provider === 'gemini') {
-    return runGemini(input, t0);
+  if (input.model.provider === 'vertex') {
+    return runVertex(input, t0);
   }
   // Anthropic path is intentionally minimal until Sprint 3.1.
   throw new Error(
-    `Provider "${input.model.provider}" not yet wired. Falling back to "pro" or set ANTHROPIC_API_KEY and rebuild.`,
+    `Provider "${input.model.provider}" not yet wired. Set ANTHROPIC_API_KEY and rebuild to enable.`,
   );
 }
 
-async function runGemini(input: RunPromptInput, t0: number): Promise<RunPromptResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not set');
-  }
+async function runVertex(input: RunPromptInput, t0: number): Promise<RunPromptResult> {
+  const vertex = getVertexClient();
 
-  const ai = new GoogleGenerativeAI(apiKey);
-  const model: GenerativeModel = ai.getGenerativeModel({
+  const generativeModel = vertex.getGenerativeModel({
     model: input.model.id,
     systemInstruction: input.systemPrompt
       ? { role: 'system', parts: [{ text: input.systemPrompt }] }
@@ -119,9 +115,21 @@ async function runGemini(input: RunPromptInput, t0: number): Promise<RunPromptRe
     },
   });
 
-  const res = await model.generateContent(input.userPrompt);
-  const text = res.response.text();
-  const usage = res.response.usageMetadata;
+  const result = await generativeModel.generateContent({
+    contents: [{ role: 'user', parts: [{ text: input.userPrompt }] }],
+  });
+
+  const candidate = result.response.candidates?.[0];
+  const text =
+    candidate?.content?.parts
+      ?.map((p) => ('text' in p ? p.text : ''))
+      .join('') ?? '';
+  const usage = result.response.usageMetadata;
+
+  if (!text) {
+    const finishReason = candidate?.finishReason ?? 'unknown';
+    throw new Error(`Vertex AI returned an empty response (finish reason: ${finishReason})`);
+  }
 
   return {
     text,
