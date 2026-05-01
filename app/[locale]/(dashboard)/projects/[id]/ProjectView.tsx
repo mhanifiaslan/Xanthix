@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseFirestore } from '@/lib/firebase/client';
 import { generateNextSectionAction } from '@/lib/actions/projects';
+import Markdown from '@/components/shared/Markdown';
 
 interface SectionView {
   id: string;
@@ -183,16 +184,11 @@ export default function ProjectView({
         )}
 
         {project.status === 'failed' && project.failureReason && (
-          <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-error)] flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium">Bu proje yarıda kaldı</p>
-                <p className="text-xs opacity-90 mt-0.5">{project.failureReason}</p>
-              </div>
-            </div>
-            <RetryButton projectId={projectId} />
-          </div>
+          <FailureBanner
+            reason={project.failureReason}
+            projectId={projectId}
+            locale={locale}
+          />
         )}
 
         <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5">
@@ -305,12 +301,58 @@ function SectionCard({
           </div>
         </div>
       </div>
-      <div className="prose prose-invert prose-sm max-w-none">
-        <pre className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)] font-sans leading-relaxed bg-transparent p-0 m-0">
-          {section.content}
-        </pre>
-      </div>
+      <Markdown>{section.content}</Markdown>
     </li>
+  );
+}
+
+function FailureBanner({
+  reason,
+  projectId,
+  locale,
+}: {
+  reason: string;
+  projectId: string;
+  locale: string;
+}) {
+  const insufficient = reason.startsWith('Insufficient tokens');
+  if (insufficient) {
+    const match = reason.match(/balance=(\d+),\s*required=(\d+)/);
+    const balance = match ? Number(match[1]) : null;
+    const required = match ? Number(match[2]) : null;
+    return (
+      <div className="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-warning)] flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Token bakiyesi bu bölüm için yetmedi</p>
+            <p className="text-xs opacity-90 mt-0.5">
+              {balance !== null && required !== null
+                ? `Bakiye: ${balance.toLocaleString(locale)} · Gerekli: ${required.toLocaleString(locale)}`
+                : reason}
+            </p>
+          </div>
+        </div>
+        <Link
+          href={`/${locale}/billing`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--color-accent)]/40 text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-colors shrink-0"
+        >
+          Token yükle
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-error)] flex items-start justify-between gap-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+        <div>
+          <p className="font-medium">Bu proje yarıda kaldı</p>
+          <p className="text-xs opacity-90 mt-0.5">{reason}</p>
+        </div>
+      </div>
+      <RetryButton projectId={projectId} />
+    </div>
   );
 }
 

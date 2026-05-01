@@ -71,6 +71,10 @@ export function getFirebaseFirestore(): Firestore {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager(),
         }),
+        // QUIC drops cause "QUIC_TOO_MANY_RTOS" mid-listener which leaves
+        // the UI stuck on stale state. Auto-detect lets the SDK fall back
+        // to long-polling whenever streaming is unstable.
+        experimentalAutoDetectLongPolling: true,
       },
       useNamedDb ? dbId : undefined,
     );
