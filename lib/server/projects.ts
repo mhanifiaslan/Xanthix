@@ -130,6 +130,10 @@ export async function createProjectDoc(input: CreateProjectInput): Promise<strin
 export interface RecordGeneratedSectionInput {
   projectId: string;
   sectionId: string;
+  /** 0-indexed array position within the project's ordered section list. */
+  arrayIndex: number;
+  /** Display order from the template — preserved for clients but never used
+      to advance the project. */
   order: number;
   title: string;
   content: string;
@@ -161,7 +165,7 @@ export async function recordGeneratedSection(
     });
 
     const total = projectSnap.data()?.totalSections ?? 0;
-    const nextIndex = input.order + 1;
+    const nextIndex = input.arrayIndex + 1;
     const allDone = nextIndex >= total;
 
     tx.update(projectRef, {
@@ -173,24 +177,25 @@ export async function recordGeneratedSection(
   });
 }
 
-export async function markSectionFailed(
-  projectId: string,
-  sectionId: string,
-  order: number,
-  title: string,
-  reason: string,
-): Promise<void> {
+export async function markSectionFailed(opts: {
+  projectId: string;
+  sectionId: string;
+  arrayIndex: number;
+  order: number;
+  title: string;
+  reason: string;
+}): Promise<void> {
   const now = FieldValue.serverTimestamp();
-  const projectRef = db().collection('projects').doc(projectId);
-  await projectRef.collection('sections').doc(sectionId).set(
+  const projectRef = db().collection('projects').doc(opts.projectId);
+  await projectRef.collection('sections').doc(opts.sectionId).set(
     {
-      order,
-      title,
+      order: opts.order,
+      title: opts.title,
       status: 'failed' as const,
       content: '',
       outputType: 'markdown',
       generationMeta: null,
-      failureReason: reason,
+      failureReason: opts.reason,
       createdAt: now,
       updatedAt: now,
     },
@@ -198,7 +203,7 @@ export async function markSectionFailed(
   );
   await projectRef.update({
     status: 'failed' as const,
-    failureReason: reason,
+    failureReason: opts.reason,
     updatedAt: now,
   });
 }

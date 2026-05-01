@@ -148,6 +148,7 @@ export async function generateNextSectionAction(
     await recordGeneratedSection({
       projectId,
       sectionId: section.id,
+      arrayIndex: currentIndex,
       order: section.order,
       title: section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
       content: result.text,
@@ -171,13 +172,15 @@ export async function generateNextSectionAction(
     return { done, sectionId: section.id };
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'Unknown error';
-    await markSectionFailed(
+    await markSectionFailed({
       projectId,
-      section.id,
-      section.order,
-      section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
+      sectionId: section.id,
+      arrayIndex: currentIndex,
+      order: section.order,
+      title:
+        section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
       reason,
-    );
+    });
     if (err instanceof InsufficientTokensError) {
       // Re-throw so the client can route to billing.
       throw err;

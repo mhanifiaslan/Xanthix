@@ -273,7 +273,7 @@ function SectionCard({
       <li className="bg-[var(--color-error)]/5 rounded-2xl border border-[var(--color-error)]/20 p-5">
         <div className="flex items-start gap-3">
           <span className="shrink-0 w-7 h-7 rounded-lg bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 flex items-center justify-center text-xs font-bold text-[var(--color-error)]">
-            {section.order + 1}
+            {index + 1}
           </span>
           <div>
             <p className="text-sm font-semibold text-[var(--color-text-primary)]">{section.title}</p>
@@ -288,7 +288,7 @@ function SectionCard({
     <li className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5">
       <div className="flex items-start gap-3 mb-3">
         <span className="shrink-0 w-7 h-7 rounded-lg bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center text-xs font-bold text-[var(--color-accent)]">
-          {section.order + 1}
+          {index + 1}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
