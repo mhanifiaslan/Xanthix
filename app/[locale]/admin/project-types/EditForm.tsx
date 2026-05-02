@@ -3,7 +3,13 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm, useFieldArray, type Control, type UseFormRegister } from 'react-hook-form';
+import {
+  useForm,
+  useFieldArray,
+  useWatch,
+  type Control,
+  type UseFormRegister,
+} from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ArrowDown,
@@ -504,10 +510,230 @@ function SectionEditor({
         </ul>
       </div>
 
+      <UserInputFieldsEditor sectionIndex={index} control={control} register={register} />
+
       {errors && Object.keys(errors).length > 0 && (
         <p className="text-xs text-[var(--color-error)]">
           Bu bölümde doğrulama hataları var (alanları kontrol et).
         </p>
+      )}
+    </li>
+  );
+}
+
+// ---- User input schema editor ---------------------------------------------
+
+const FIELD_TYPES = ['text', 'textarea', 'number', 'select', 'date'] as const;
+
+function UserInputFieldsEditor({
+  sectionIndex,
+  control,
+  register,
+}: {
+  sectionIndex: number;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+}) {
+  const requiresInput = useWatch({
+    control,
+    name: `sections.${sectionIndex}.requiresUserInput` as const,
+  });
+
+  const fields = useFieldArray({
+    control,
+    name: `sections.${sectionIndex}.userInputSchema.fields` as never,
+  });
+
+  if (!requiresInput) return null;
+
+  return (
+    <div className="rounded-xl border border-[var(--color-accent)]/20 bg-[var(--color-accent)]/5 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-[var(--color-accent)] uppercase tracking-wider">
+          Wizard alanları
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            fields.append({
+              id: `field_${fields.fields.length + 1}`,
+              label: { tr: '', en: '', es: '' },
+              type: 'text',
+              required: false,
+            } as never)
+          }
+          className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+        >
+          <Plus size={12} /> Alan ekle
+        </button>
+      </div>
+      {fields.fields.length === 0 ? (
+        <p className="text-xs text-[var(--color-text-secondary)] italic">
+          Henüz alan yok. Kullanıcıdan ek bilgi almak için bir alan ekle.
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {fields.fields.map((f, fi) => (
+            <UserInputFieldEditor
+              key={f.id}
+              control={control}
+              register={register}
+              sectionIndex={sectionIndex}
+              fieldIndex={fi}
+              onRemove={() => fields.remove(fi)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function UserInputFieldEditor({
+  control,
+  register,
+  sectionIndex,
+  fieldIndex,
+  onRemove,
+}: {
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+  sectionIndex: number;
+  fieldIndex: number;
+  onRemove: () => void;
+}) {
+  const fieldType = useWatch({
+    control,
+    name: `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.type` as const,
+  });
+
+  const options = useFieldArray({
+    control,
+    name: `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.options` as never,
+  });
+
+  return (
+    <li className="rounded-lg border border-white/10 bg-[var(--color-background)] p-3 space-y-3 relative">
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute top-2 right-2 p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
+        aria-label="Alanı sil"
+      >
+        <Trash2 size={12} />
+      </button>
+
+      <div className="grid grid-cols-2 gap-3 pr-6">
+        <Field label="Alan ID">
+          <input
+            {...register(
+              `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.id` as const,
+            )}
+            className={inputCls}
+            placeholder="team_size"
+          />
+        </Field>
+        <Field label="Tip">
+          <select
+            {...register(
+              `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.type` as const,
+            )}
+            className={inputCls}
+          >
+            {FIELD_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <LocalizedField
+        label="Etiket"
+        register={register}
+        namePrefix={`sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.label`}
+      />
+      <LocalizedField
+        label="Placeholder (opsiyonel)"
+        register={register}
+        namePrefix={`sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.placeholder`}
+      />
+
+      <Field label="Zorunlu mu?">
+        <label className="flex items-center gap-2 mt-1">
+          <input
+            type="checkbox"
+            {...register(
+              `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.required` as const,
+            )}
+            className="rounded"
+          />
+          <span className="text-sm text-[var(--color-text-secondary)]">
+            Wizard bu alan boş bırakılırsa devam etmesin
+          </span>
+        </label>
+      </Field>
+
+      {fieldType === 'select' && (
+        <div className="rounded-lg border border-white/5 bg-white/[0.02] p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+              Seçenekler
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                options.append({
+                  value: '',
+                  label: { tr: '', en: '', es: '' },
+                } as never)
+              }
+              className="inline-flex items-center gap-1 text-[10px] text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+            >
+              <Plus size={10} /> Seçenek ekle
+            </button>
+          </div>
+          {options.fields.length === 0 ? (
+            <p className="text-[10px] text-[var(--color-text-secondary)] italic">
+              Seçenek tanımlanmadı.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {options.fields.map((o, oi) => (
+                <li key={o.id} className="grid grid-cols-[120px_1fr_28px] gap-2 items-start">
+                  <input
+                    {...register(
+                      `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.options.${oi}.value` as const,
+                    )}
+                    className={inputCls}
+                    placeholder="value"
+                  />
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['tr', 'en', 'es'] as const).map((loc) => (
+                      <input
+                        key={loc}
+                        {...register(
+                          `sections.${sectionIndex}.userInputSchema.fields.${fieldIndex}.options.${oi}.label.${loc}` as const,
+                        )}
+                        className={inputCls}
+                        placeholder={loc.toUpperCase()}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => options.remove(oi)}
+                    className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
+                    aria-label="Seçeneği sil"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </li>
   );

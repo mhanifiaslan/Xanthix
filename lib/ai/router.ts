@@ -79,6 +79,8 @@ export interface RunPromptInput {
   userPrompt: string;
   outputLanguage: string;
   maxOutputTokens?: number;
+  /** When true, the model is instructed to return strict JSON. */
+  jsonMode?: boolean;
 }
 
 export interface RunPromptResult {
@@ -114,9 +116,10 @@ async function runVertex(input: RunPromptInput, t0: number): Promise<RunPromptRe
       ? { role: 'system', parts: [{ text: input.systemPrompt }] }
       : undefined,
     generationConfig: {
-      temperature: 0.5,
+      temperature: input.jsonMode ? 0.2 : 0.5,
       topP: 0.95,
       maxOutputTokens: input.maxOutputTokens ?? 8192,
+      ...(input.jsonMode ? { responseMimeType: 'application/json' } : {}),
     },
   });
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Sparkles } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { hasLocale } from 'next-intl';
 import { listProjectTypes } from '@/lib/server/projectTypes';
@@ -39,13 +39,22 @@ export default async function AdminProjectTypesPage({
             {types.length} template{types.length === 1 ? '' : 's'} defined.
           </p>
         </div>
-        <Link
-          href={`/${locale}/admin/project-types/new`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <Plus size={15} />
-          New type
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/${locale}/admin/project-types/from-guide`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500/15 to-purple-500/15 border border-indigo-500/30 text-indigo-300 hover:from-indigo-500/25 hover:to-purple-500/25 text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Sparkles size={15} />
+            AI ile oluştur
+          </Link>
+          <Link
+            href={`/${locale}/admin/project-types/new`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <Plus size={15} />
+            Yeni tür
+          </Link>
+        </div>
       </header>
 
       <div className="px-8 py-8 max-w-6xl mx-auto space-y-6">
