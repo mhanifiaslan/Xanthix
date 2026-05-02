@@ -13,6 +13,7 @@ import {
   type ProjectTypeWriteInput,
 } from '@/types/projectType';
 import { pickModel, runPrompt } from '@/lib/ai/router';
+import { extractPdfText } from '@/lib/server/extractPdfText';
 
 function assertAdmin(role: string): void {
   if (role !== 'admin' && role !== 'super_admin') {
@@ -159,4 +160,55 @@ export async function draftFromGuideAction(
 
   // Loose path — best-effort coerce. Admin reviews + saves explicitly.
   return parsed as ProjectTypeWriteInput;
+}
+
+// ----- Same flow, but the guide arrives as an uploaded PDF ------------------
+
+const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
+const ALLOWED_LANGS = ['tr', 'en', 'es', 'auto'] as const;
+
+export async function draftFromGuidePdfAction(
+  formData: FormData,
+): Promise<ProjectTypeWriteInput> {
+  const session = await requireServerSession();
+  assertAdmin(session.role);
+
+  const file = formData.get('pdf');
+  if (!(file instanceof File)) {
+    throw new Error('PDF dosyası bulunamadı.');
+  }
+  if (file.size === 0) {
+    throw new Error('PDF dosyası boş.');
+  }
+  if (file.size > MAX_PDF_BYTES) {
+    throw new Error(
+      `PDF en fazla ${Math.round(MAX_PDF_BYTES / (1024 * 1024))} MB olabilir.`,
+    );
+  }
+  const isPdf =
+    file.type === 'application/pdf' ||
+    file.name.toLowerCase().endsWith('.pdf');
+  if (!isPdf) {
+    throw new Error('Yüklenen dosya PDF değil.');
+  }
+
+  const rawLang = String(formData.get('hintLanguage') ?? 'auto');
+  const hintLanguage = (ALLOWED_LANGS as readonly string[]).includes(rawLang)
+    ? (rawLang as (typeof ALLOWED_LANGS)[number])
+    : 'auto';
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const text = (await extractPdfText(buffer)).trim();
+
+  if (text.length < 200) {
+    throw new Error(
+      'PDF\'den anlamlı metin çıkarılamadı (taranmış olabilir). Lütfen metni doğrudan yapıştır veya OCR ile okunmuş PDF yükle.',
+    );
+  }
+
+  // Re-use the text path. Truncate hard if the PDF is enormous so we don't
+  // blow past Vertex's input window.
+  const trimmed = text.slice(0, 80_000);
+
+  return draftFromGuideAction({ guide: trimmed, hintLanguage });
 }
