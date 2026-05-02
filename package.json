@@ -15,6 +15,7 @@
     "firebase:emu": "firebase emulators:start --import=./.firebase-data --export-on-exit",
     "admin:set-role": "node scripts/set-admin-claim.mjs",
     "admin:grant-tokens": "node scripts/grant-tokens.mjs",
+    "admin:grant-org-tokens": "node scripts/grant-org-tokens.mjs",
     "seed:project-types": "tsx scripts/seed-project-types.ts"
   },
   "dependencies": {

@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BarChart2,
   BookOpen,
+  Building2,
   CreditCard,
   FolderGit2,
   HelpCircle,
@@ -69,6 +70,12 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
         { icon: BookOpen, label: 'Şablonlarım', href: '#', soon: true },
         { icon: Archive, label: 'Arşiv', href: localePath('/archive') },
         { icon: BarChart2, label: 'İstatistikler', href: '#', soon: true },
+      ],
+    },
+    {
+      label: 'Çalışma alanı',
+      items: [
+        { icon: Building2, label: 'Kurumlarım', href: localePath('/organizations') },
       ],
     },
     {
