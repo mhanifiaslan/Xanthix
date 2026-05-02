@@ -27,6 +27,7 @@ import {
 } from '@/lib/actions/projects';
 import { requestExportAction } from '@/lib/actions/exports';
 import Markdown from '@/components/shared/Markdown';
+import GanttView from '@/components/shared/GanttView';
 
 interface SectionView {
   id: string;
@@ -326,7 +327,11 @@ function SectionCard({
         </div>
       </div>
       <div className={isRevising ? 'opacity-60 transition-opacity' : ''}>
-        <Markdown>{section.content}</Markdown>
+        {section.outputType === 'gantt' ? (
+          <GanttView content={section.content} />
+        ) : (
+          <Markdown>{section.content}</Markdown>
+        )}
       </div>
       {canRevise && (
         <ReviseSectionInline projectId={projectId} sectionId={section.id} />

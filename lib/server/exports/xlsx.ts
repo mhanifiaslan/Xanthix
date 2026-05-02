@@ -1,6 +1,7 @@
 import 'server-only';
 import ExcelJS from 'exceljs';
 import { extractMarkdownTables } from './extractTables';
+import { parseGantt } from '@/lib/gantt/parse';
 import type { ProjectDoc, SectionDoc } from '@/types/project';
 
 export interface BuildXlsxInput {
@@ -94,6 +95,12 @@ export async function buildProjectXlsx(input: BuildXlsxInput): Promise<Buffer> {
   // ---- Section sheets ------------------------------------------------------
   for (const [idx, section] of ordered.entries()) {
     if (section.status !== 'ready') continue;
+
+    if (section.outputType === 'gantt') {
+      addGanttSheet(wb, project, section, idx, isTr);
+      continue;
+    }
+
     const tables = extractMarkdownTables(section.content);
     if (tables.length === 0) continue;
 
@@ -233,4 +240,76 @@ function sanitizeSheetName(name: string): string {
     .replace(/[\\/?*\[\]:]/g, '-')
     .slice(0, 31) // Excel cap
     .trim() || 'Section';
+}
+
+function addGanttSheet(
+  wb: ExcelJS.Workbook,
+  project: ProjectDoc,
+  section: SectionDoc,
+  idx: number,
+  isTr: boolean,
+): void {
+  const parsed = parseGantt(section.content);
+  if (!parsed) return;
+
+  const sheetName = sanitizeSheetName(`${idx + 1} ${section.title}`);
+  const sheet = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', ySplit: 1 }],
+    properties: { tabColor: { argb: 'FFEC4899' } },
+    pageSetup: {
+      orientation: 'landscape',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.5, right: 0.5, top: 0.7, bottom: 0.7, header: 0.3, footer: 0.3 },
+    },
+    headerFooter: {
+      oddHeader: `&L&"Calibri"&10&K808080${project.title}&R&"Calibri"&10&K808080${section.title}`,
+      oddFooter: '&C&"Calibri"&9&K808080Xanthix.ai · &P / &N',
+    },
+  });
+
+  sheet.columns = [
+    { header: 'ID', key: 'id', width: 10 },
+    {
+      header: isTr ? 'Görev' : 'Task',
+      key: 'name',
+      width: 40,
+    },
+    {
+      header: isTr ? 'Başlangıç' : 'Start',
+      key: 'start',
+      width: 14,
+    },
+    { header: isTr ? 'Bitiş' : 'End', key: 'end', width: 14 },
+    { header: isTr ? 'Süre' : 'Duration', key: 'duration', width: 10 },
+    {
+      header: isTr ? 'Bağımlı' : 'Dependencies',
+      key: 'deps',
+      width: 18,
+    },
+  ];
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFEC4899' },
+  };
+  headerRow.alignment = { vertical: 'middle' };
+
+  for (const task of parsed.tasks) {
+    sheet.addRow({
+      id: task.id,
+      name: task.name,
+      start: task.start ?? null,
+      end: task.end ?? null,
+      duration: task.durationLabel,
+      deps: task.dependencies.join(', '),
+    });
+  }
+
+  // Date columns: Excel-native formatting.
+  sheet.getColumn('start').numFmt = 'yyyy-mm-dd';
+  sheet.getColumn('end').numFmt = 'yyyy-mm-dd';
 }

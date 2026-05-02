@@ -15,6 +15,7 @@ import {
   TextRun,
 } from 'docx';
 import { markdownToDocxBlocks } from './markdownToDocx';
+import { ganttToDocxBlocks } from './ganttToDocx';
 import type { ProjectDoc, SectionDoc } from '@/types/project';
 
 export interface BuildDocxInput {
@@ -165,7 +166,11 @@ export async function buildProjectDocx(input: BuildDocxInput): Promise<Buffer> {
         spacing: { before: 240, after: 200 },
       }),
     );
-    body.push(...markdownToDocxBlocks(section.content));
+    if (section.outputType === 'gantt') {
+      body.push(...ganttToDocxBlocks(section.content));
+    } else {
+      body.push(...markdownToDocxBlocks(section.content));
+    }
   }
 
   // ---- Header / Footer -----------------------------------------------------
