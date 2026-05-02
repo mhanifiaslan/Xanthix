@@ -73,6 +73,29 @@ export const sectionDocSchema = z.object({
 });
 export type SectionDoc = z.infer<typeof sectionDocSchema>;
 
+export const EXPORT_FORMATS = ['docx', 'pdf', 'xlsx', 'gantt-png'] as const;
+export type ExportFormat = (typeof EXPORT_FORMATS)[number];
+
+export const EXPORT_STATUSES = ['pending', 'ready', 'failed'] as const;
+export type ExportStatus = (typeof EXPORT_STATUSES)[number];
+
+export const exportDocSchema = z.object({
+  id: z.string(),
+  format: z.enum(EXPORT_FORMATS),
+  status: z.enum(EXPORT_STATUSES),
+  storagePath: z.string().nullable().optional(),
+  /** Signed URL — re-issued on demand; treat as short-lived. */
+  downloadUrl: z.string().nullable().optional(),
+  downloadUrlExpiresAt: z.union([z.string(), z.date()]).nullable().optional(),
+  fileName: z.string().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  /** Bytes — populated once the file is uploaded. */
+  sizeBytes: z.number().int().nonnegative().nullable().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
+});
+export type ExportDoc = z.infer<typeof exportDocSchema>;
+
 export const messageDocSchema = z.object({
   id: z.string(),
   role: z.enum(['user', 'assistant', 'system']),

@@ -22,6 +22,7 @@
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "clsx": "^2.1.1",
+    "docx": "^9.6.1",
     "firebase": "^11.4.0",
     "firebase-admin": "^13.1.0",
     "lucide-react": "^1.8.0",

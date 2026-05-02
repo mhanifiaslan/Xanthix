@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   CircleDashed,
+  Download,
   Loader2,
   RefreshCw,
   Sparkles,
@@ -24,6 +25,7 @@ import {
   generateNextSectionAction,
   reviseSectionAction,
 } from '@/lib/actions/projects';
+import { requestExportAction } from '@/lib/actions/exports';
 import Markdown from '@/components/shared/Markdown';
 
 interface SectionView {
@@ -174,7 +176,10 @@ export default function ProjectView({
             </p>
           </div>
         </div>
-        <StatusBadge status={project.status} />
+        <div className="flex items-center gap-3 shrink-0">
+          {project.status === 'ready' && <ExportButton projectId={projectId} />}
+          <StatusBadge status={project.status} />
+        </div>
       </header>
 
       <div className="px-8 py-6 max-w-4xl mx-auto space-y-4">
@@ -423,6 +428,56 @@ function ReviseSectionInline({
           Revize et
         </button>
       </div>
+    </div>
+  );
+}
+
+function ExportButton({ projectId }: { projectId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = () => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const { downloadUrl, fileName } = await requestExportAction({
+          projectId,
+          format: 'docx',
+        });
+        // Trigger a same-tab download. The signed URL has a content-disposition
+        // attachment header so the browser saves rather than navigates.
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Dışa aktarma başarısız.');
+      }
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {error && (
+        <span className="text-xs text-[var(--color-error)] max-w-[280px] truncate" title={error}>
+          {error}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+      >
+        {isPending ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <Download size={14} />
+        )}
+        {isPending ? 'Hazırlanıyor…' : 'DOCX indir'}
+      </button>
     </div>
   );
 }
