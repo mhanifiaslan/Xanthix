@@ -5,6 +5,7 @@ import { getAdminFirestore, getAdminStorage } from '@/lib/firebase/admin';
 import { getProjectTypeById } from '@/lib/server/projectTypes';
 import { getProjectDoc, listSectionsByProject } from '@/lib/server/projects';
 import { buildProjectDocx } from './docx';
+import { buildProjectXlsx } from './xlsx';
 import type { ExportDoc, ExportFormat } from '@/types/project';
 
 const SIGNED_URL_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -20,10 +21,29 @@ interface CreateExportResult {
   fileName: string;
 }
 
+const FORMAT_META: Record<
+  ExportFormat,
+  { extension: string; mime: string; supported: boolean }
+> = {
+  docx: {
+    extension: 'docx',
+    mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    supported: true,
+  },
+  xlsx: {
+    extension: 'xlsx',
+    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    supported: true,
+  },
+  pdf: { extension: 'pdf', mime: 'application/pdf', supported: false },
+  'gantt-png': { extension: 'png', mime: 'image/png', supported: false },
+};
+
 export async function createProjectExport(
   args: CreateExportArgs,
 ): Promise<CreateExportResult> {
-  if (args.format !== 'docx') {
+  const meta = FORMAT_META[args.format];
+  if (!meta.supported) {
     throw new Error(`Format "${args.format}" is not yet supported.`);
   }
 
@@ -64,7 +84,10 @@ export async function createProjectExport(
   });
 
   try {
-    const buffer = await buildProjectDocx({ project, sections, projectTypeName });
+    const buffer =
+      args.format === 'xlsx'
+        ? await buildProjectXlsx({ project, sections, projectTypeName })
+        : await buildProjectDocx({ project, sections, projectTypeName });
 
     const safeTitle = project.title
       .replace(/[^a-zA-Z0-9À-ɏЀ-ӿ\s-]/g, '')
@@ -72,14 +95,13 @@ export async function createProjectExport(
       .slice(0, 50)
       .toLowerCase()
       .replace(/^-+|-+$/g, '') || 'project';
-    const fileName = `xanthix-${project.projectTypeSlug}-${safeTitle}.docx`;
+    const fileName = `xanthix-${project.projectTypeSlug}-${safeTitle}.${meta.extension}`;
     const storagePath = `projects/${args.projectId}/exports/${exportId}/${fileName}`;
 
     const bucket = getAdminStorage().bucket();
     const file = bucket.file(storagePath);
     await file.save(buffer, {
-      contentType:
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contentType: meta.mime,
       metadata: { cacheControl: 'private, max-age=300' },
     });
 

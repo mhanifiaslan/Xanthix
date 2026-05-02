@@ -433,19 +433,22 @@ function ReviseSectionInline({
 }
 
 function ExportButton({ projectId }: { projectId: string }) {
-  const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [pendingFormat, setPendingFormat] = useState<
+    'docx' | 'xlsx' | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleClick = () => {
+  const trigger = (format: 'docx' | 'xlsx') => {
     setError(null);
-    startTransition(async () => {
+    setPendingFormat(format);
+    setOpen(false);
+    (async () => {
       try {
         const { downloadUrl, fileName } = await requestExportAction({
           projectId,
-          format: 'docx',
+          format,
         });
-        // Trigger a same-tab download. The signed URL has a content-disposition
-        // attachment header so the browser saves rather than navigates.
         const a = document.createElement('a');
         a.href = downloadUrl;
         a.download = fileName;
@@ -454,30 +457,56 @@ function ExportButton({ projectId }: { projectId: string }) {
         a.remove();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Dışa aktarma başarısız.');
+      } finally {
+        setPendingFormat(null);
       }
-    });
+    })();
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {error && (
-        <span className="text-xs text-[var(--color-error)] max-w-[280px] truncate" title={error}>
-          {error}
-        </span>
-      )}
+    <div className="relative">
       <button
         type="button"
-        onClick={handleClick}
-        disabled={isPending}
+        onClick={() => setOpen((v) => !v)}
+        disabled={pendingFormat !== null}
         className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
       >
-        {isPending ? (
+        {pendingFormat ? (
           <Loader2 size={14} className="animate-spin" />
         ) : (
           <Download size={14} />
         )}
-        {isPending ? 'Hazırlanıyor…' : 'DOCX indir'}
+        {pendingFormat
+          ? `${pendingFormat.toUpperCase()} hazırlanıyor…`
+          : 'Dışa aktar'}
       </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-white/10 bg-[var(--color-card)] shadow-lg z-20 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => trigger('docx')}
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors flex items-center gap-2"
+          >
+            <Download size={14} className="text-[var(--color-accent)]" />
+            <span className="flex-1">Word (DOCX)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => trigger('xlsx')}
+            className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition-colors flex items-center gap-2 border-t border-white/5"
+          >
+            <Download size={14} className="text-[var(--color-success)]" />
+            <span className="flex-1">Excel (XLSX)</span>
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <p className="absolute right-0 top-full mt-2 text-xs text-[var(--color-error)] max-w-[280px]" title={error}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
