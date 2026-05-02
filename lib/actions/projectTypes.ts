@@ -70,10 +70,15 @@ const draftSchema = z.object({
 export type DraftFromGuideInput = z.input<typeof draftSchema>;
 
 const DRAFT_SYSTEM = `
-You extract project-application templates from a program guide. You must
-return a single JSON object that matches the requested schema exactly.
-Never wrap the JSON in prose; never add Markdown fences. Strings remain
-plain text — do not escape outside of standard JSON rules.
+You extract project-application templates from a program guide. You MUST
+return a single raw JSON object — nothing else. Specifically:
+- No surrounding prose, commentary, or apology text.
+- No Markdown code fences (no \`\`\`json, no \`\`\`).
+- No leading whitespace before { and no trailing text after }.
+- Only standard JSON escaping inside string values.
+
+The output MUST be parseable by JSON.parse on its own without any
+post-processing.
 `.trim();
 
 const DRAFT_PROMPT_TEMPLATE = (guide: string) =>
@@ -141,13 +146,15 @@ export async function draftFromGuideAction(
     userPrompt: DRAFT_PROMPT_TEMPLATE(input.guide),
     outputLanguage: input.hintLanguage,
     jsonMode: true,
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
   });
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.text);
-  } catch (e) {
+  const parsed = parseDraftJson(result.text);
+  if (!parsed) {
+    console.error('[draftFromGuide] non-JSON response from AI', {
+      length: result.text.length,
+      preview: result.text.slice(0, 800),
+    });
     throw new Error(
       'AI taslağı geçerli JSON döndürmedi. Tekrar deneyebilir veya rehbere ek bağlam ekleyebilirsin.',
     );
@@ -160,6 +167,46 @@ export async function draftFromGuideAction(
 
   // Loose path — best-effort coerce. Admin reviews + saves explicitly.
   return parsed as ProjectTypeWriteInput;
+}
+
+/**
+ * Coerces a raw model response into a JSON object. Tries, in order:
+ *   1. Strict JSON.parse on the trimmed text.
+ *   2. JSON inside the first ```json fenced block.
+ *   3. The substring from the first '{' to the last '}'.
+ * Returns null when nothing parses.
+ */
+function parseDraftJson(raw: string): unknown {
+  const text = raw.trim();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    // fall through
+  }
+
+  const fence = /```(?:json)?\s*([\s\S]+?)\s*```/i.exec(text);
+  if (fence?.[1]) {
+    try {
+      return JSON.parse(fence[1]);
+    } catch {
+      // fall through
+    }
+  }
+
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const slice = text.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(slice);
+    } catch {
+      // give up
+    }
+  }
+
+  return null;
 }
 
 // ----- Same flow, but the guide arrives as an uploaded PDF ------------------
