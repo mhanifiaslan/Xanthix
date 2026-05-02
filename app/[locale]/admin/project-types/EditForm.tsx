@@ -91,6 +91,23 @@ export default function EditForm({ initial, mode, locale }: Props) {
     });
   };
 
+  // Surface validation errors visibly. Without this handler RHF silently
+  // refuses to call onSubmit when zod fails, so the Save button feels dead
+  // even though the form is just rejecting the data.
+  const onInvalid = (formErrors: Record<string, unknown>) => {
+    console.warn('[EditForm] validation failed', formErrors);
+    const summary = collectErrorMessages(formErrors).slice(0, 5);
+    setError(
+      summary.length > 0
+        ? `Form alanlarında hata var:\n• ${summary.join('\n• ')}`
+        : 'Form alanlarında doğrulama hataları var. Kırmızı işaretli alanları kontrol et.',
+    );
+    // Scroll to the top so the banner is visible.
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const onDelete = () => {
     if (!initial.id) return;
     setError(null);
@@ -106,7 +123,7 @@ export default function EditForm({ initial, mode, locale }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="min-h-full pb-12">
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="min-h-full pb-12">
       <header className="px-8 py-5 border-b border-white/5 flex items-center justify-between sticky top-0 z-10 bg-[var(--color-background)]">
         <div className="flex items-center gap-4 min-w-0">
           <Link
@@ -148,7 +165,7 @@ export default function EditForm({ initial, mode, locale }: Props) {
 
       <div className="px-8 py-8 max-w-5xl mx-auto space-y-8">
         {error && (
-          <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-error)]">
+          <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-error)] whitespace-pre-line">
             {error}
           </div>
         )}
@@ -882,4 +899,24 @@ function IconButton({
       {children}
     </button>
   );
+}
+
+// Walks RHF's nested error tree and collects "<path>: <message>" lines.
+function collectErrorMessages(
+  errors: Record<string, unknown>,
+  prefix = '',
+): string[] {
+  const out: string[] = [];
+  for (const key of Object.keys(errors)) {
+    const node = errors[key] as Record<string, unknown> | { message?: string };
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (node && typeof node === 'object') {
+      if ('message' in node && typeof node.message === 'string') {
+        out.push(`${path}: ${node.message}`);
+      } else {
+        out.push(...collectErrorMessages(node as Record<string, unknown>, path));
+      }
+    }
+  }
+  return out;
 }
