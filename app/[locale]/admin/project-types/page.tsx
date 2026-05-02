@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { setRequestLocale } from 'next-intl/server';
 import { hasLocale } from 'next-intl';
 import { listProjectTypes } from '@/lib/server/projectTypes';
@@ -67,7 +67,7 @@ export default async function AdminProjectTypesPage({
               return (
                 <li
                   key={t.id}
-                  className={`bg-[var(--color-card)] rounded-2xl border p-6 transition-all ${
+                  className={`relative bg-[var(--color-card)] rounded-2xl border p-6 transition-all ${
                     t.active ? 'border-white/5' : 'border-white/5 opacity-60'
                   }`}
                 >
@@ -88,6 +88,12 @@ export default async function AdminProjectTypesPage({
                         }
                       />
                     </div>
+                    <Link
+                      href={`/${locale}/admin/project-types/${t.id}`}
+                      className="absolute top-5 right-5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-white/10 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/20 transition-colors"
+                    >
+                      <Pencil size={12} /> Düzenle
+                    </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
