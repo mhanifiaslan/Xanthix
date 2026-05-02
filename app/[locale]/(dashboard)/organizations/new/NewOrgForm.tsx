@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Building2, Loader2 } from 'lucide-react';
 import { createOrgAction } from '@/lib/actions/organizations';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 export default function NewOrgForm({ locale }: { locale: string }) {
   const router = useRouter();
+  const { refreshClaims } = useAuth();
   const [name, setName] = useState('');
   const [country, setCountry] = useState('TR');
   const [vatNumber, setVatNumber] = useState('');
@@ -30,6 +32,10 @@ export default function NewOrgForm({ locale }: { locale: string }) {
           vatNumber: vatNumber.trim() || undefined,
           billingEmail: billingEmail.trim() || undefined,
         });
+        // syncOrgClaims has already updated the user's custom claims server-
+        // side; refreshClaims forces the ID token + session cookie to roll so
+        // org-only project types and the new orgIds appear immediately.
+        await refreshClaims();
         router.replace(`/${locale}/organizations/${id}`);
         router.refresh();
       } catch (err) {

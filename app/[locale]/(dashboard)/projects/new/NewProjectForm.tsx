@@ -2,7 +2,7 @@
 
 import { type FormEvent, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Building2, Loader2, Sparkles, User } from 'lucide-react';
 import Link from 'next/link';
 import { startProjectAction } from '@/lib/actions/projects';
 import type { ProjectType, Section } from '@/types/projectType';
@@ -11,18 +11,38 @@ import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 
 type FieldValue = string | number | boolean;
 
+interface OrgOption {
+  id: string;
+  name: string;
+  tokenBalance: number;
+}
+
 export default function NewProjectForm({
   projectType,
   locale,
+  orgs,
+  preselectedOrgId,
 }: {
   projectType: ProjectType;
   locale: string;
+  orgs: OrgOption[];
+  preselectedOrgId: string | null;
 }) {
   const router = useRouter();
   const [idea, setIdea] = useState('');
   const [inputs, setInputs] = useState<
     Record<string, Record<string, FieldValue>>
   >({});
+  const orgOnly = projectType.visibility === 'org_only';
+  const [contextOrgId, setContextOrgId] = useState<string | ''>(() => {
+    // Org-only types must run in an org context. Pre-select the requested
+    // one when it's eligible, else the first eligible org.
+    if (preselectedOrgId && orgs.some((o) => o.id === preselectedOrgId)) {
+      return preselectedOrgId;
+    }
+    if (orgOnly && orgs.length > 0) return orgs[0].id;
+    return '';
+  });
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -41,10 +61,19 @@ export default function NewProjectForm({
       setError('Lütfen fikrinizi en az 20 karakterle anlatın.');
       return;
     }
+    if (orgOnly && !contextOrgId) {
+      setError('Bu proje türü kuruma özel — bir kurum seç.');
+      return;
+    }
     startTransition(async () => {
       try {
         const { projectId } = await startProjectAction(
-          { projectTypeSlug: projectType.slug, idea: idea.trim(), userInputs: inputs },
+          {
+            projectTypeSlug: projectType.slug,
+            idea: idea.trim(),
+            userInputs: inputs,
+            orgId: contextOrgId || undefined,
+          },
           loc,
         );
         router.replace(`/${locale}/projects/${projectId}`);
@@ -111,6 +140,44 @@ export default function NewProjectForm({
           <p className="text-xs text-[var(--color-text-secondary)] mt-2">
             {idea.trim().length} / 20+ karakter
           </p>
+        </div>
+
+        {/* Context picker — personal vs each eligible org. */}
+        <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5">
+          <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+            Bu proje hangi adına?
+          </p>
+          <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+            Token bakiyesi seçtiğin tarafın cüzdanından düşer. Kurum seçersen
+            proje, kurumun tüm üyeleri tarafından görüntülenebilir.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {!orgOnly && (
+              <ContextChoice
+                selected={contextOrgId === ''}
+                onSelect={() => setContextOrgId('')}
+                icon={<User size={16} />}
+                title="Kişisel"
+                hint="Kendi token bakiyenden düşer"
+              />
+            )}
+            {orgs.map((o) => (
+              <ContextChoice
+                key={o.id}
+                selected={contextOrgId === o.id}
+                onSelect={() => setContextOrgId(o.id)}
+                icon={<Building2 size={16} />}
+                title={o.name}
+                hint={`${o.tokenBalance.toLocaleString(locale)} token bakiyesi`}
+              />
+            ))}
+          </div>
+          {orgs.length === 0 && orgOnly && (
+            <p className="text-xs text-[var(--color-warning)] mt-3">
+              Bu proje türü kuruma özel ve henüz hiçbir kuruma üye değilsin.
+              Önce bir kurum oluştur veya bir kuruma davet edilmeyi bekle.
+            </p>
+          )}
         </div>
 
         {sectionsRequiringInput.length > 0 && (
@@ -234,5 +301,58 @@ function SectionInputCard({
         ))}
       </div>
     </div>
+  );
+}
+
+function ContextChoice({
+  selected,
+  onSelect,
+  icon,
+  title,
+  hint,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={
+        'flex items-start gap-3 px-4 py-3 rounded-xl border text-left transition-colors ' +
+        (selected
+          ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/40'
+          : 'bg-[var(--color-background)] border-white/10 hover:border-white/20')
+      }
+    >
+      <span
+        className={
+          'shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ' +
+          (selected
+            ? 'bg-[var(--color-accent)]/20 text-[var(--color-accent)]'
+            : 'bg-white/5 text-[var(--color-text-secondary)]')
+        }
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p
+          className={
+            'text-sm font-medium truncate ' +
+            (selected
+              ? 'text-[var(--color-accent)]'
+              : 'text-[var(--color-text-primary)]')
+          }
+        >
+          {title}
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)] truncate">
+          {hint}
+        </p>
+      </div>
+    </button>
   );
 }

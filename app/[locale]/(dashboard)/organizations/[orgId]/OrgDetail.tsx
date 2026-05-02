@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Building2,
   Crown,
+  FolderGit2,
   Loader2,
   LogOut,
   Mail,
@@ -30,6 +31,7 @@ import {
   ORG_ROLES,
   type OrgRole,
 } from '@/types/organization';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface OrgView {
   id: string;
@@ -50,6 +52,22 @@ interface MemberView {
   role: OrgRole;
 }
 
+interface ProjectView {
+  id: string;
+  title: string;
+  status:
+    | 'draft'
+    | 'generating'
+    | 'paused'
+    | 'ready'
+    | 'failed'
+    | 'archived';
+  currentSectionIndex: number;
+  totalSections: number;
+  tokensSpent: number;
+  projectTypeSlug: string;
+}
+
 const ROLE_LABEL: Record<OrgRole, string> = {
   owner: 'Sahip',
   admin: 'Admin',
@@ -61,12 +79,14 @@ export default function OrgDetail({
   locale,
   org,
   members,
+  projects,
   myUid,
   myRole,
 }: {
   locale: string;
   org: OrgView;
   members: MemberView[];
+  projects: ProjectView[];
   myUid: string;
   myRole: OrgRole;
 }) {
@@ -74,7 +94,7 @@ export default function OrgDetail({
   const isManager = (ORG_MANAGER_ROLES as readonly OrgRole[]).includes(myRole);
   const isOwner = myRole === 'owner';
 
-  const [tab, setTab] = useState<'members' | 'settings'>('members');
+  const [tab, setTab] = useState<'members' | 'projects' | 'settings'>('members');
 
   return (
     <div className="min-h-full pb-12">
@@ -111,34 +131,28 @@ export default function OrgDetail({
       </header>
 
       <div className="px-8 max-w-4xl mx-auto mt-8">
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[var(--color-card)] border border-white/5 mb-6">
-          <button
-            type="button"
+        <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[var(--color-card)] border border-white/5 mb-6">
+          <TabButton
+            active={tab === 'members'}
             onClick={() => setTab('members')}
-            className={
-              'flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ' +
-              (tab === 'members'
-                ? 'bg-[var(--color-background)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')
-            }
           >
             <Users size={14} /> Üyeler
-          </button>
-          <button
-            type="button"
+          </TabButton>
+          <TabButton
+            active={tab === 'projects'}
+            onClick={() => setTab('projects')}
+          >
+            <FolderGit2 size={14} /> Projeler ({projects.length})
+          </TabButton>
+          <TabButton
+            active={tab === 'settings'}
             onClick={() => setTab('settings')}
-            className={
-              'flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ' +
-              (tab === 'settings'
-                ? 'bg-[var(--color-background)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')
-            }
           >
             <Building2 size={14} /> Ayarlar
-          </button>
+          </TabButton>
         </div>
 
-        {tab === 'members' ? (
+        {tab === 'members' && (
           <MembersTab
             org={org}
             members={members}
@@ -148,11 +162,114 @@ export default function OrgDetail({
             onRefresh={() => router.refresh()}
             locale={locale}
           />
-        ) : (
-          <SettingsTab org={org} canEdit={isManager} />
         )}
+        {tab === 'projects' && (
+          <ProjectsTab projects={projects} locale={locale} />
+        )}
+        {tab === 'settings' && <SettingsTab org={org} canEdit={isManager} />}
       </div>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ' +
+        (active
+          ? 'bg-[var(--color-background)] text-[var(--color-text-primary)] shadow-sm'
+          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function ProjectsTab({
+  projects,
+  locale,
+}: {
+  projects: ProjectView[];
+  locale: string;
+}) {
+  if (projects.length === 0) {
+    return (
+      <div className="bg-[var(--color-card)] rounded-2xl border border-dashed border-white/10 p-8 text-center">
+        <p className="text-sm text-[var(--color-text-primary)] font-medium mb-1">
+          Bu kurumda henüz proje yok
+        </p>
+        <p className="text-xs text-[var(--color-text-secondary)]">
+          Yeni proje açarken bağlam olarak bu kurumu seçen üyelerin projeleri
+          burada görünür.
+        </p>
+      </div>
+    );
+  }
+
+  const STATUS: Record<ProjectView['status'], string> = {
+    draft: 'Taslak',
+    generating: 'Üretiliyor',
+    paused: 'Duraklatıldı',
+    ready: 'Hazır',
+    failed: 'Başarısız',
+    archived: 'Arşivli',
+  };
+
+  return (
+    <ul className="space-y-2">
+      {projects.map((p) => {
+        const progress =
+          p.totalSections === 0
+            ? 0
+            : Math.round((p.currentSectionIndex / p.totalSections) * 100);
+        return (
+          <li key={p.id}>
+            <Link
+              href={`/${locale}/projects/${p.id}`}
+              className="block bg-[var(--color-card)] rounded-2xl border border-white/5 hover:border-[var(--color-accent)]/30 p-4 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider">
+                    {STATUS[p.status]}
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate mt-0.5">
+                    {p.title}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                    {p.projectTypeSlug} ·{' '}
+                    {p.tokensSpent.toLocaleString(locale)} token harcandı
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-[var(--color-text-secondary)] mb-1">
+                    {p.currentSectionIndex} / {p.totalSections}
+                  </p>
+                  <div className="w-28 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-[var(--color-accent)]"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -312,6 +429,7 @@ function MemberRow({
   locale: string;
 }) {
   const router = useRouter();
+  const { refreshClaims } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -327,6 +445,7 @@ function MemberRow({
           uid: member.uid,
           role: next,
         });
+        if (isMe) await refreshClaims();
         onRefresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Rol değiştirilemedi.');
@@ -342,6 +461,7 @@ function MemberRow({
       try {
         await removeMemberAction({ orgId: org.id, uid: member.uid });
         if (isMe) {
+          await refreshClaims();
           router.replace(`/${locale}/organizations`);
         }
         onRefresh();
@@ -358,6 +478,7 @@ function MemberRow({
     startTransition(async () => {
       try {
         await transferOwnershipAction({ orgId: org.id, toUid: member.uid });
+        await refreshClaims();
         onRefresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Devir başarısız.');

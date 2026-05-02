@@ -177,7 +177,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshClaims = useCallback(async () => {
     const fbUser = getFirebaseAuth().currentUser;
     if (!fbUser) return;
-    await fbUser.getIdToken(true);
+    // Force a token rotation so the latest custom claims (orgIds, role, …)
+    // appear in the ID token, then exchange that token for a brand-new
+    // session cookie so server reads see the same claims.
+    const idToken = await fbUser.getIdToken(true);
+    try {
+      await createSessionAction(idToken);
+    } catch (e) {
+      console.warn('[auth] failed to refresh session cookie', e);
+    }
     setUser(await toAuthUser(fbUser));
   }, []);
 

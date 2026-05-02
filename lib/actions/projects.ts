@@ -27,6 +27,7 @@ import {
   hydratePrompt,
 } from '@/lib/ai/hydratePrompt';
 import { getAdminFirestore } from '@/lib/firebase/admin';
+import { getMemberDoc } from '@/lib/server/organizations';
 import type { ProjectDoc } from '@/types/project';
 import type { Locale } from '@/i18n/routing';
 
@@ -39,6 +40,10 @@ const startProjectSchema = z.object({
   userInputs: z
     .record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])))
     .optional(),
+  /** Optional: run this project on behalf of an organisation. Tokens come
+   *  from the org wallet and the project becomes visible to all org
+   *  members with read access. */
+  orgId: z.string().min(1).optional(),
 });
 
 export type StartProjectInput = z.input<typeof startProjectSchema>;
@@ -50,13 +55,30 @@ export async function startProjectAction(
   const session = await requireServerSession();
   const input = startProjectSchema.parse(rawInput);
 
+  // Validate org context — the session claim might be stale, so we re-check
+  // membership in Firestore directly.
+  const orgId = input.orgId ?? null;
+  if (orgId) {
+    const member = await getMemberDoc(orgId, session.uid);
+    if (!member) {
+      throw new Error(
+        'Bu kuruma üye değilsin; proje açamazsın. Önce kurum üyesi olarak eklenmelisin.',
+      );
+    }
+  }
+
   const type = await getProjectTypeBySlug(input.projectTypeSlug, {
-    orgIds: session.orgIds,
+    orgIds: orgId ? [orgId, ...session.orgIds] : session.orgIds,
   });
   if (!type) throw new Error('Project type not found or not accessible');
+  if (type.visibility === 'org_only' && !orgId) {
+    throw new Error(
+      'Bu proje türü kuruma özel — bir kurum bağlamında başlatılmalı.',
+    );
+  }
 
-  // Bare-minimum upfront check — full debit happens per section.
-  const balance = await getTokenBalance(session.uid);
+  // Bare-minimum upfront check on the wallet that will pay for it.
+  const balance = await getTokenBalance({ userId: session.uid, orgId });
   if (balance < 1) {
     throw new InsufficientTokensError(balance, 1);
   }
@@ -68,7 +90,7 @@ export async function startProjectAction(
 
   const projectId = await createProjectDoc({
     ownerUid: session.uid,
-    orgId: null,
+    orgId,
     projectTypeId: type.id,
     projectTypeSlug: type.slug,
     totalSections: type.sections.length,
@@ -79,10 +101,31 @@ export async function startProjectAction(
   });
 
   revalidatePath(`/${locale}/projects`);
+  if (orgId) revalidatePath(`/${locale}/organizations/${orgId}`);
   return { projectId };
 }
 
 // -----------------------------------------------------------------------------
+
+/**
+ * Returns true when the calling session may act on this project. Owners
+ * always pass, super_admins always pass, and any org member of the
+ * project's org passes too.
+ */
+async function canActOnProject(
+  project: ProjectDoc,
+  session: { uid: string; role: string; orgIds: readonly string[] },
+): Promise<boolean> {
+  if (project.ownerUid === session.uid) return true;
+  if (session.role === 'super_admin') return true;
+  if (project.orgId) {
+    if (session.orgIds.includes(project.orgId)) return true;
+    // Claim might be stale; double-check Firestore.
+    const member = await getMemberDoc(project.orgId, session.uid);
+    if (member) return true;
+  }
+  return false;
+}
 
 export async function generateNextSectionAction(
   projectId: string,
@@ -91,7 +134,7 @@ export async function generateNextSectionAction(
 
   const project = await getProjectDoc(projectId);
   if (!project) throw new Error('Project not found');
-  if (project.ownerUid !== session.uid && session.role !== 'super_admin') {
+  if (!(await canActOnProject(project, session))) {
     throw new Error('Forbidden');
   }
   if (project.status !== 'generating') {
@@ -221,7 +264,7 @@ export async function reviseSectionAction(
 
   const project = await getProjectDoc(input.projectId);
   if (!project) throw new Error('Project not found');
-  if (project.ownerUid !== session.uid && session.role !== 'super_admin') {
+  if (!(await canActOnProject(project, session))) {
     throw new Error('Forbidden');
   }
   if (project.status === 'generating') {

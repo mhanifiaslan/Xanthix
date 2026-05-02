@@ -55,6 +55,8 @@ interface ProjectView {
   failureReason: string | null;
   outputLanguage: string;
   projectTypeSlug: string;
+  orgId: string | null;
+  orgName: string | null;
 }
 
 export default function ProjectView({
@@ -171,9 +173,25 @@ export default function ProjectView({
             <h1 className="text-lg font-semibold text-[var(--color-text-primary)] truncate">
               {project.title}
             </h1>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-              {project.projectTypeSlug} · {project.outputLanguage} ·{' '}
-              {project.tokensSpent.toLocaleString(locale)} token harcandı
+            <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 flex items-center flex-wrap gap-x-1.5 gap-y-1">
+              <span>{project.projectTypeSlug}</span>
+              <span>·</span>
+              <span>{project.outputLanguage}</span>
+              <span>·</span>
+              <span>{project.tokensSpent.toLocaleString(locale)} token</span>
+              <span>·</span>
+              {project.orgId ? (
+                <Link
+                  href={`/${locale}/organizations/${project.orgId}`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 hover:bg-[var(--color-accent)]/20 transition-colors"
+                >
+                  🏢 {project.orgName ?? project.orgId}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  Kişisel
+                </span>
+              )}
             </p>
           </div>
         </div>

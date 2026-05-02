@@ -3,6 +3,7 @@ import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { getProjectDoc, listSectionsByProject } from '@/lib/server/projects';
+import { getMemberDoc, getOrgDoc } from '@/lib/server/organizations';
 import { routing } from '@/i18n/routing';
 import ProjectView from './ProjectView';
 
@@ -22,11 +23,23 @@ export default async function ProjectPage({
 
   const project = await getProjectDoc(id);
   if (!project) notFound();
-  if (project.ownerUid !== session.uid && session.role !== 'super_admin') {
+
+  // Owner, super_admin, or any member of the project's org can view it.
+  const isOwner = project.ownerUid === session.uid;
+  const isSuperAdmin = session.role === 'super_admin';
+  let isOrgMember = false;
+  if (!isOwner && !isSuperAdmin && project.orgId) {
+    const member = await getMemberDoc(project.orgId, session.uid);
+    isOrgMember = !!member;
+  }
+  if (!isOwner && !isSuperAdmin && !isOrgMember) {
     notFound();
   }
 
-  const initialSections = await listSectionsByProject(id);
+  const [initialSections, org] = await Promise.all([
+    listSectionsByProject(id),
+    project.orgId ? getOrgDoc(project.orgId) : Promise.resolve(null),
+  ]);
 
   return (
     <ProjectView
@@ -42,6 +55,8 @@ export default async function ProjectPage({
         failureReason: project.failureReason ?? null,
         outputLanguage: project.outputLanguage,
         projectTypeSlug: project.projectTypeSlug,
+        orgId: project.orgId ?? null,
+        orgName: org?.name ?? null,
       }}
       initialSections={initialSections.map((s) => ({
         id: s.id,

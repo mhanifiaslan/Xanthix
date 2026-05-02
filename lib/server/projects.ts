@@ -69,6 +69,16 @@ export async function listProjectsByOwner(uid: string): Promise<ProjectDoc[]> {
   return snap.docs.map(toProjectDoc).filter((p): p is ProjectDoc => p !== null);
 }
 
+export async function listProjectsByOrg(orgId: string): Promise<ProjectDoc[]> {
+  const snap = await db()
+    .collection('projects')
+    .where('orgId', '==', orgId)
+    .orderBy('updatedAt', 'desc')
+    .limit(50)
+    .get();
+  return snap.docs.map(toProjectDoc).filter((p): p is ProjectDoc => p !== null);
+}
+
 export async function listSectionsByProject(projectId: string): Promise<SectionDoc[]> {
   const snap = await db()
     .collection('projects')
@@ -265,8 +275,9 @@ export class InsufficientTokensError extends Error {
 }
 
 /**
- * Atomically debits the user's token wallet and writes a ledger entry.
- * Throws `InsufficientTokensError` when the balance can't cover the spend.
+ * Atomically debits the right wallet (org if `orgId` is set, otherwise the
+ * user) and writes a ledger entry. Throws `InsufficientTokensError` when
+ * the wallet can't cover the spend.
  */
 export async function spendTokens(opts: {
   userId: string;
@@ -275,27 +286,36 @@ export async function spendTokens(opts: {
   reason: string;
   relatedProjectId?: string;
   relatedSectionId?: string;
-}): Promise<{ balanceAfter: number }> {
+}): Promise<{ balanceAfter: number; walletKind: 'user' | 'org' }> {
   if (opts.amount < 0) throw new Error('amount must be non-negative');
 
   const firestore = db();
-  const userRef = firestore.collection('users').doc(opts.userId);
+  const targetRef = opts.orgId
+    ? firestore.collection('organizations').doc(opts.orgId)
+    : firestore.collection('users').doc(opts.userId);
+  const walletKind: 'user' | 'org' = opts.orgId ? 'org' : 'user';
   const txRef = firestore.collection('tokenTransactions').doc();
 
   const balanceAfter = await firestore.runTransaction(async (tx) => {
-    const snap = await tx.get(userRef);
+    const snap = await tx.get(targetRef);
+    if (!snap.exists) {
+      throw new Error(`${walletKind} wallet not found`);
+    }
     const balance = (snap.data()?.tokenBalance as number | undefined) ?? 0;
     if (balance < opts.amount) {
       throw new InsufficientTokensError(balance, opts.amount);
     }
     const next = balance - opts.amount;
-    tx.update(userRef, {
+    tx.update(targetRef, {
       tokenBalance: next,
       updatedAt: FieldValue.serverTimestamp(),
     });
     tx.set(txRef, {
+      // The acting user is recorded in both modes so org admins can audit
+      // who spent what against the shared pool.
       userId: opts.userId,
       orgId: opts.orgId ?? null,
+      walletKind,
       type: 'spend' as const,
       amount: opts.amount,
       balanceAfter: next,
@@ -307,11 +327,17 @@ export async function spendTokens(opts: {
     return next;
   });
 
-  return { balanceAfter };
+  return { balanceAfter, walletKind };
 }
 
-export async function getTokenBalance(userId: string): Promise<number> {
-  const snap = await db().collection('users').doc(userId).get();
+export async function getTokenBalance(opts: {
+  userId: string;
+  orgId?: string | null;
+}): Promise<number> {
+  const ref = opts.orgId
+    ? db().collection('organizations').doc(opts.orgId)
+    : db().collection('users').doc(opts.userId);
+  const snap = await ref.get();
   return (snap.data()?.tokenBalance as number | undefined) ?? 0;
 }
 
