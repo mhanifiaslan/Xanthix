@@ -40,9 +40,10 @@ export async function upsertProjectTypeAction(
 
   const stored = await upsertProjectType(parsed);
 
-  revalidatePath('/admin/project-types', 'page');
-  revalidatePath(`/admin/project-types/${stored.id}`, 'page');
-  revalidatePath(`/project-types/${stored.slug}`, 'page');
+  // Force-dynamic on the touched pages already gives us fresh reads on the
+  // next navigation; one layout-level invalidation keeps any nested cached
+  // data honest without pinging three separate paths.
+  revalidatePath('/[locale]/admin/project-types', 'layout');
 
   return { id: stored.id, slug: stored.slug };
 }
@@ -56,7 +57,7 @@ export async function deleteProjectTypeAction(
   assertAdmin(session.role);
   const { id } = deleteSchema.parse(raw);
   await deleteProjectType(id);
-  revalidatePath('/admin/project-types', 'page');
+  revalidatePath('/[locale]/admin/project-types', 'layout');
   return { ok: true };
 }
 

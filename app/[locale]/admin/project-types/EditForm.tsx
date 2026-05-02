@@ -317,6 +317,34 @@ export default function EditForm({ initial, mode, locale }: Props) {
         </section>
       </div>
 
+      {/* Bottom save bar — mirrors the sticky header so the user never has
+          to scroll back up to ship a long edit. */}
+      <div className="px-8 mt-8">
+        <div className="max-w-5xl mx-auto flex items-center justify-end gap-3 py-4 border-t border-white/5">
+          <p className="mr-auto text-xs text-[var(--color-text-secondary)]">
+            {sections.fields.length} bölüm tanımlı
+          </p>
+          {mode === 'edit' && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border border-[var(--color-error)]/30 text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={14} /> Sil
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isPending}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+          >
+            {isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Kaydet
+          </button>
+        </div>
+      </div>
+
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--color-card)] rounded-2xl border border-white/10 p-6 max-w-md w-full">
@@ -343,6 +371,24 @@ export default function EditForm({ initial, mode, locale }: Props) {
               >
                 Evet, sil
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit-in-flight overlay — covers the whole form so the user can't
+          double-click and so it's obvious the system is working. */}
+      {isPending && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-40">
+          <div className="bg-[var(--color-card)] rounded-2xl border border-white/10 px-8 py-6 flex items-center gap-4 max-w-sm">
+            <Loader2 size={28} className="animate-spin text-[var(--color-accent)] shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                Kaydediliyor…
+              </p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                Birkaç saniye sürebilir, lütfen bekle.
+              </p>
             </div>
           </div>
         </div>
