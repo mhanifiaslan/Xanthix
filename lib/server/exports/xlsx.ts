@@ -26,8 +26,12 @@ export async function buildProjectXlsx(input: BuildXlsxInput): Promise<Buffer> {
   const { project, sections, projectTypeName } = input;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Xanthix.ai';
+  wb.lastModifiedBy = 'Xanthix.ai';
   wb.created = new Date();
+  wb.modified = new Date();
   wb.title = project.title;
+  wb.subject = `${projectTypeName} draft`;
+  wb.company = 'Xanthix.ai';
 
   const isTr = project.outputLanguage === 'tr';
   const localeFor = (tr: string, en: string) => (isTr ? tr : en);
@@ -95,7 +99,19 @@ export async function buildProjectXlsx(input: BuildXlsxInput): Promise<Buffer> {
 
     const sheetName = sanitizeSheetName(`${idx + 1} ${section.title}`);
     const sheet = wb.addWorksheet(sheetName, {
-      views: [{ state: 'frozen', ySplit: 1 }],
+      views: [{ state: 'frozen', ySplit: 2 }],
+      properties: { tabColor: { argb: 'FF4F46E5' } },
+      pageSetup: {
+        orientation: 'landscape',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.5, right: 0.5, top: 0.7, bottom: 0.7, header: 0.3, footer: 0.3 },
+      },
+      headerFooter: {
+        oddHeader: `&L&"Calibri"&10&K808080${project.title}&R&"Calibri"&10&K808080${section.title}`,
+        oddFooter: '&C&"Calibri"&9&K808080Xanthix.ai · &P / &N',
+      },
     });
 
     let row = 1;
