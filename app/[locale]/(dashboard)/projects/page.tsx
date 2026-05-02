@@ -11,7 +11,11 @@ import {
 import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
-import { listProjectsByOwner } from '@/lib/server/projects';
+import {
+  listProjectsByOrg,
+  listProjectsByOwner,
+} from '@/lib/server/projects';
+import { getActiveWorkspace } from '@/lib/server/workspace';
 import { routing } from '@/i18n/routing';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +41,21 @@ export default async function ProjectsListPage({
   const session = await getServerSession();
   if (!session) redirect(`/${locale}/login`);
 
-  const projects = await listProjectsByOwner(session.uid);
+  const workspace = await getActiveWorkspace(session.uid);
+
+  const projects =
+    workspace.kind === 'org'
+      ? await listProjectsByOrg(workspace.orgId)
+      : (await listProjectsByOwner(session.uid)).filter(
+          (p) => !p.orgId, // personal scope hides org-context projects
+        );
+
+  const headingTitle =
+    workspace.kind === 'org' ? `${workspace.orgName} projeleri` : 'Projelerim';
+  const subtitle =
+    workspace.kind === 'org'
+      ? `${workspace.orgName} adına açılmış projeler`
+      : 'Kişisel projelerin';
 
   return (
     <div className="min-h-full pb-12">
@@ -48,10 +66,10 @@ export default async function ProjectsListPage({
           </div>
           <div>
             <h1 className="text-xl font-bold text-[var(--color-text-primary)]">
-              Projelerim
+              {headingTitle}
             </h1>
             <p className="text-xs text-[var(--color-text-secondary)]">
-              Toplam {projects.length} proje
+              {projects.length} proje · {subtitle}
             </p>
           </div>
         </div>

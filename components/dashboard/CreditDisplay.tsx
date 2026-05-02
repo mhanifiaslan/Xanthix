@@ -1,30 +1,39 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useUserDoc } from '@/lib/hooks/useUserDoc';
+import { getFirebaseFirestore } from '@/lib/firebase/client';
 
-const PLAN_LABELS: Record<string, { tr: string; en: string; es: string }> = {
-  free: { tr: 'Ücretsiz Plan', en: 'Free Plan', es: 'Plan gratuito' },
-  individual: { tr: 'Bireysel Plan', en: 'Individual Plan', es: 'Plan individual' },
-  org_member: { tr: 'Kurumsal Üye', en: 'Org member', es: 'Miembro de organización' },
-};
+interface WalletDisplay {
+  kind: 'personal' | 'org';
+  orgId?: string;
+  initialBalance: number;
+  label: string;
+}
 
-export default function CreditDisplay() {
-  const userDoc = useUserDoc();
+export default function CreditDisplay({ wallet }: { wallet: WalletDisplay }) {
   const locale = useLocale() as 'tr' | 'en' | 'es';
+  const userDoc = useUserDoc();
+  const orgBalance = useOrgBalance(
+    wallet.kind === 'org' ? wallet.orgId ?? null : null,
+    wallet.initialBalance,
+  );
 
-  const planLabel =
-    PLAN_LABELS[userDoc?.planType ?? 'free'][locale] ?? 'Free Plan';
-  const balance = userDoc?.tokenBalance ?? null;
+  const balance =
+    wallet.kind === 'org'
+      ? orgBalance
+      : userDoc?.tokenBalance ?? wallet.initialBalance;
 
   return (
-    <div className="mb-6 px-4">
+    <div className="mb-6 px-4 mt-2">
       <div className="bg-[var(--color-card)] rounded-xl p-4 border border-white/5">
         <div className="flex justify-between items-start mb-3">
           <div>
             <span className="text-xs text-[var(--color-text-secondary)] block mb-1">
-              {planLabel}
+              {wallet.label}
             </span>
             <span className="text-2xl font-bold text-[var(--color-text-primary)] tabular-nums">
               {balance === null ? '—' : balance.toLocaleString(locale)}
@@ -43,4 +52,24 @@ export default function CreditDisplay() {
       </div>
     </div>
   );
+}
+
+function useOrgBalance(orgId: string | null, initial: number): number {
+  const [balance, setBalance] = useState(initial);
+  useEffect(() => {
+    if (!orgId) return;
+    const ref = doc(getFirebaseFirestore(), 'organizations', orgId);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.data();
+        if (typeof data?.tokenBalance === 'number') {
+          setBalance(data.tokenBalance);
+        }
+      },
+      (err) => console.warn('[CreditDisplay] org snapshot error', err),
+    );
+    return () => unsub();
+  }, [orgId]);
+  return balance;
 }

@@ -5,6 +5,7 @@ import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { listProjectTypes } from '@/lib/server/projectTypes';
 import { getServerSession } from '@/lib/server/getServerSession';
+import { getActiveWorkspace } from '@/lib/server/workspace';
 import { routing, type Locale } from '@/i18n/routing';
 import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 
@@ -22,7 +23,9 @@ export default async function ProjectTypesPage({
   const session = await getServerSession();
   if (!session) notFound();
 
-  const types = await listProjectTypes({ orgIds: session.orgIds });
+  const workspace = await getActiveWorkspace(session.uid);
+  const orgIds = workspace.kind === 'org' ? [workspace.orgId] : [];
+  const types = await listProjectTypes({ orgIds });
   const loc = locale as Locale;
 
   return (

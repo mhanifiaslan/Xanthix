@@ -4,6 +4,7 @@ import { setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { getProjectTypeBySlug } from '@/lib/server/projectTypes';
 import { listOrgsForUser } from '@/lib/server/organizations';
+import { getActiveWorkspace } from '@/lib/server/workspace';
 import { routing } from '@/i18n/routing';
 import NewProjectForm from './NewProjectForm';
 
@@ -26,13 +27,21 @@ export default async function NewProjectPage({
   const { type: typeSlug, org: preselectedOrg } = await searchParams;
   if (!typeSlug) redirect(`/${locale}/project-types`);
 
-  // Pull the user's orgs from Firestore directly so newly-joined orgs show
-  // up even before the session cookie rotates.
-  const orgs = await listOrgsForUser(session.uid);
+  // Pull the user's orgs + active workspace in parallel; the active
+  // workspace becomes the default project context unless the URL pinned
+  // a different one via ?org=.
+  const [orgs, workspace] = await Promise.all([
+    listOrgsForUser(session.uid),
+    getActiveWorkspace(session.uid),
+  ]);
   const orgIds = orgs.map((o) => o.id);
 
   const type = await getProjectTypeBySlug(typeSlug, { orgIds });
   if (!type) notFound();
+
+  const fallbackContext =
+    preselectedOrg ??
+    (workspace.kind === 'org' ? workspace.orgId : null);
 
   return (
     <NewProjectForm
@@ -43,7 +52,7 @@ export default async function NewProjectPage({
         name: o.name,
         tokenBalance: o.tokenBalance,
       }))}
-      preselectedOrgId={preselectedOrg ?? null}
+      preselectedOrgId={fallbackContext}
     />
   );
 }

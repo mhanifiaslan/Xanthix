@@ -4,11 +4,13 @@ import { ArrowRight, Plus } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
-import RecentProjectCard from '@/components/dashboard/RecentProjectCard';
-import ProjectsTable from '@/components/dashboard/ProjectsTable';
 import { listProjectTypes } from '@/lib/server/projectTypes';
+import {
+  listProjectsByOrg,
+  listProjectsByOwner,
+} from '@/lib/server/projects';
 import { getServerSession } from '@/lib/server/getServerSession';
-import { mockProjects } from '@/lib/mock-data';
+import { getActiveWorkspace } from '@/lib/server/workspace';
 import { routing, type Locale } from '@/i18n/routing';
 import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 
@@ -26,13 +28,17 @@ export default async function DashboardPage({
   const session = await getServerSession();
   if (!session) notFound();
 
-  const allTypes = await listProjectTypes({ orgIds: session.orgIds });
+  const workspace = await getActiveWorkspace(session.uid);
+  const orgIds = workspace.kind === 'org' ? [workspace.orgId] : [];
+  const allTypes = await listProjectTypes({ orgIds });
   const featuredTypes = allTypes.slice(0, 3);
   const loc = locale as Locale;
 
-  // TODO(sprint-3): wire recent + all projects to Firestore once we have a
-  // projects collection. For now they're mock so the UI stays populated.
-  const recentProjects = mockProjects.slice(0, 4);
+  const projectsForWorkspace =
+    workspace.kind === 'org'
+      ? await listProjectsByOrg(workspace.orgId)
+      : (await listProjectsByOwner(session.uid)).filter((p) => !p.orgId);
+  const recentProjects = projectsForWorkspace.slice(0, 4);
 
   return (
     <div className="min-h-full pb-12">
@@ -109,17 +115,53 @@ export default async function DashboardPage({
             </Link>
           </div>
 
-          <div className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
-            {recentProjects.map((project) => (
-              <div key={project.id} className="snap-start">
-                <RecentProjectCard project={project} />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <ProjectsTable projects={mockProjects} />
+          {recentProjects.length === 0 ? (
+            <div className="bg-[var(--color-card)] rounded-2xl border border-dashed border-white/10 p-8 text-center">
+              <p className="text-sm text-[var(--color-text-secondary)]">
+                {workspace.kind === 'org'
+                  ? `${workspace.orgName} adına henüz bir proje açılmamış.`
+                  : 'Henüz bir projen yok. Yukarıdan bir tür seçip başlayabilirsin.'}
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory hide-scrollbar">
+              {recentProjects.map((p) => {
+                const progress =
+                  p.totalSections === 0
+                    ? 0
+                    : Math.round((p.currentSectionIndex / p.totalSections) * 100);
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/${locale}/projects/${p.id}`}
+                    className="snap-start min-w-[280px] bg-[var(--color-card)] rounded-2xl border border-white/5 hover:border-[var(--color-accent)]/30 p-5 transition-colors"
+                  >
+                    <p className="text-xs uppercase tracking-wider text-[var(--color-text-secondary)]">
+                      {p.projectTypeSlug}
+                    </p>
+                    <p className="text-sm font-semibold text-[var(--color-text-primary)] mt-1 line-clamp-2 min-h-[40px]">
+                      {p.title}
+                    </p>
+                    <div className="mt-4">
+                      <div className="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1">
+                        <span>İlerleme</span>
+                        <span>%{progress}</span>
+                      </div>
+                      <div className="w-full bg-[var(--color-background)] rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--color-accent)]"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-3 pt-3 border-t border-white/5">
+                      {p.tokensSpent.toLocaleString(locale)} token harcandı
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </section>
       </main>
     </div>
