@@ -72,13 +72,13 @@ export const sectionSchema = z.object({
   agentPromptTemplate: z.string().min(20),
   criteria: z.array(z.string().min(1)).default([]),
   outputType: z.enum(SECTION_OUTPUT_TYPES).default('markdown'),
-  modelOverride: z.enum(MODEL_OVERRIDES).optional(),
+  modelOverride: z.enum(MODEL_OVERRIDES).nullish(),
   // True when the wizard should pause and collect extra info from the user
   // before this section runs.
   requiresUserInput: z.boolean().default(false),
-  userInputSchema: userInputSchemaSchema.optional(),
+  userInputSchema: userInputSchemaSchema.nullish(),
   // Soft target — used for budgeting + UI hints. Real billing happens after.
-  estimatedTokens: z.number().int().positive().optional(),
+  estimatedTokens: z.number().int().positive().nullish(),
 });
 export type Section = z.infer<typeof sectionSchema>;
 
@@ -94,11 +94,12 @@ export const projectTypeSchema = z.object({
   tier: z.enum(PROJECT_TIERS),
   outputLanguage: z.enum(PROJECT_OUTPUT_LANGUAGES),
   visibility: z.enum(PROJECT_VISIBILITIES),
-  allowedOrgIds: z.array(z.string()).optional(),
-  // For UI / search hints — not enforced.
-  budgetHint: localizedString.optional(),
-  callDatesHint: localizedString.optional(),
-  whoCanApplyHint: localizedString.optional(),
+  allowedOrgIds: z.array(z.string()).nullish(),
+  // For UI / search hints — not enforced. Nullish so AI drafts can pass
+  // explicit nulls without tripping validation.
+  budgetHint: localizedString.nullish(),
+  callDatesHint: localizedString.nullish(),
+  whoCanApplyHint: localizedString.nullish(),
   // Lucide icon name — UI maps to component.
   iconName: z.string().default('FolderGit2'),
   active: z.boolean().default(true),

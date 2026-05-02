@@ -119,7 +119,10 @@ export async function generateNextSectionAction(
     }
   }
 
-  const model = pickModel({ tier: type.tier, override: section.modelOverride });
+  const model = pickModel({
+    tier: type.tier,
+    override: section.modelOverride ?? undefined,
+  });
 
   const userPrompt = hydratePrompt(section, {
     userIdea: project.idea,
@@ -276,7 +279,7 @@ export async function reviseSectionAction(
 
   const model = pickModel({
     tier: type.tier,
-    override: sectionTemplate.modelOverride,
+    override: sectionTemplate.modelOverride ?? undefined,
   });
 
   // Optimistically flip the section into "revising" so the UI can show a
