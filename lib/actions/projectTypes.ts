@@ -1,11 +1,12 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import { requireServerSession } from '@/lib/server/getServerSession';
 import {
   deleteProjectType,
   getProjectTypeById,
+  PROJECT_TYPES_CACHE_TAG,
   upsertProjectType,
 } from '@/lib/server/projectTypes';
 import {
@@ -42,8 +43,10 @@ export async function upsertProjectTypeAction(
 
   // Force-dynamic on the touched pages already gives us fresh reads on the
   // next navigation; one layout-level invalidation keeps any nested cached
-  // data honest without pinging three separate paths.
+  // data honest without pinging three separate paths. The unstable_cache
+  // wrappers around listProjectTypes need a separate tag invalidation.
   revalidatePath('/[locale]/admin/project-types', 'layout');
+  revalidateTag(PROJECT_TYPES_CACHE_TAG, 'max');
 
   return { id: stored.id, slug: stored.slug };
 }
@@ -58,6 +61,7 @@ export async function deleteProjectTypeAction(
   const { id } = deleteSchema.parse(raw);
   await deleteProjectType(id);
   revalidatePath('/[locale]/admin/project-types', 'layout');
+  revalidateTag(PROJECT_TYPES_CACHE_TAG, 'max');
   return { ok: true };
 }
 

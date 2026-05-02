@@ -1,4 +1,5 @@
 import 'server-only';
+import { unstable_cache } from 'next/cache';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { getAdminFirestore } from '@/lib/firebase/admin';
 import {
@@ -6,6 +7,8 @@ import {
   type ProjectTypeWrite,
   projectTypeSchema,
 } from '@/types/projectType';
+
+export const PROJECT_TYPES_CACHE_TAG = 'project-types';
 
 const COLLECTION = 'projectTypes';
 
@@ -43,30 +46,47 @@ function serialize(snap: FirebaseFirestore.DocumentSnapshot): ProjectType | null
   return parsed.data;
 }
 
+// The full active set is shared across all callers; we cache it under one
+// tag and apply the visibility / category filters in memory after retrieval.
+const fetchAllActiveTypes = unstable_cache(
+  async (): Promise<ProjectType[]> => {
+    const snap = await db()
+      .collection(COLLECTION)
+      .where('active', '==', true)
+      .get();
+    return snap.docs
+      .map(serialize)
+      .filter((t): t is ProjectType => t !== null);
+  },
+  ['project-types-active'],
+  { tags: [PROJECT_TYPES_CACHE_TAG], revalidate: 300 },
+);
+
+const fetchAllTypes = unstable_cache(
+  async (): Promise<ProjectType[]> => {
+    const snap = await db().collection(COLLECTION).get();
+    return snap.docs
+      .map(serialize)
+      .filter((t): t is ProjectType => t !== null);
+  },
+  ['project-types-all'],
+  { tags: [PROJECT_TYPES_CACHE_TAG], revalidate: 300 },
+);
+
 export async function listProjectTypes(filter: ListFilter = {}): Promise<ProjectType[]> {
-  let q: FirebaseFirestore.Query = db().collection(COLLECTION);
+  const base = filter.includeInactive
+    ? await fetchAllTypes()
+    : await fetchAllActiveTypes();
 
-  if (!filter.includeInactive) {
-    q = q.where('active', '==', true);
-  }
-  if (filter.category) {
-    q = q.where('category', '==', filter.category);
-  }
-
-  const snap = await q.get();
-  const all = snap.docs.map(serialize).filter((t): t is ProjectType => t !== null);
-
-  // Apply visibility check in code — Firestore "OR" queries against array
-  // membership are awkward, and the set is small.
   const orgIds = filter.orgIds ?? [];
-  const visible = all.filter((t) => {
+  const filtered = base.filter((t) => {
+    if (filter.category && t.category !== filter.category) return false;
     if (t.visibility === 'public') return true;
     if (!t.allowedOrgIds || t.allowedOrgIds.length === 0) return false;
     return t.allowedOrgIds.some((id) => orgIds.includes(id));
   });
 
-  // Stable order: category, then name.tr (for now) — UI can resort.
-  return visible.sort((a, b) => {
+  return filtered.slice().sort((a, b) => {
     const c = a.category.localeCompare(b.category);
     return c !== 0 ? c : a.name.tr.localeCompare(b.name.tr);
   });

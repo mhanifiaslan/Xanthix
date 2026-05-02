@@ -83,20 +83,45 @@ export async function listMembers(orgId: string): Promise<OrgMemberDoc[]> {
 }
 
 export async function listOrgsForUser(uid: string): Promise<OrganizationDoc[]> {
-  // Memberships are per-org subcollection docs keyed by uid; collectionGroup
-  // lets us discover them in one query.
+  const result = await listOrgsWithMembershipForUser(uid);
+  return result.map((r) => r.org);
+}
+
+/**
+ * Like listOrgsForUser, but also returns the member doc for each org so
+ * downstream callers (the workspace switcher, the layout) can render the
+ * user's role + addedAt without an extra N+1 round-trip.
+ */
+export async function listOrgsWithMembershipForUser(
+  uid: string,
+): Promise<Array<{ org: OrganizationDoc; member: OrgMemberDoc }>> {
+  // collectionGroup query returns the membership docs directly; no need
+  // for a separate per-org getMemberDoc afterwards.
   const memberships = await db()
     .collectionGroup('members')
     .where('uid', '==', uid)
     .get();
-  const orgIds = Array.from(
-    new Set(memberships.docs.map((d) => d.ref.parent.parent?.id).filter(Boolean) as string[]),
-  );
-  if (orgIds.length === 0) return [];
 
-  // Fetch in parallel; org count per user stays small in practice.
-  const docs = await Promise.all(orgIds.map((id) => getOrgDoc(id)));
-  return docs.filter((o): o is OrganizationDoc => o !== null);
+  type Pair = { orgId: string; member: OrgMemberDoc };
+  const pairs: Pair[] = [];
+  for (const doc of memberships.docs) {
+    const orgId = doc.ref.parent.parent?.id;
+    if (!orgId) continue;
+    const m = toMemberDoc(doc);
+    if (!m) continue;
+    pairs.push({ orgId, member: m });
+  }
+  if (pairs.length === 0) return [];
+
+  // Org docs in parallel — one network round-trip per org, but that's the
+  // minimum since the org metadata lives separately from member rows.
+  const orgs = await Promise.all(pairs.map((p) => getOrgDoc(p.orgId)));
+  const result: Array<{ org: OrganizationDoc; member: OrgMemberDoc }> = [];
+  for (let i = 0; i < pairs.length; i++) {
+    const org = orgs[i];
+    if (org) result.push({ org, member: pairs[i].member });
+  }
+  return result;
 }
 
 // ----- Org lifecycle --------------------------------------------------------

@@ -72,6 +72,11 @@ export default function WorkspaceSwitcher({
       try {
         await setActiveWorkspaceAction(target);
         setOpen(false);
+        // Workspaces are different worlds — current page's data may not
+        // even exist in the new context (a personal project URL won't
+        // resolve in an org workspace). Send the user to the workspace
+        // home so they always land somewhere meaningful.
+        router.push(`/${locale}`);
         router.refresh();
       } finally {
         setPendingKey(null);

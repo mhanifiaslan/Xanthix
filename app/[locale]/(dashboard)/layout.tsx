@@ -1,10 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { listProjectTypes } from '@/lib/server/projectTypes';
-import {
-  getMemberDoc,
-  listOrgsForUser,
-} from '@/lib/server/organizations';
+import { listOrgsWithMembershipForUser } from '@/lib/server/organizations';
 import { getActiveWorkspace } from '@/lib/server/workspace';
 import { getTokenBalance } from '@/lib/server/projects';
 import Sidebar from '@/components/dashboard/Sidebar';
@@ -24,39 +21,32 @@ export default async function DashboardLayout({
   const isAdmin =
     session.role === 'admin' || session.role === 'super_admin';
 
-  // Resolve the active workspace and the user's org list in parallel; the
-  // sidebar needs both for the switcher + scoped queries.
-  const [workspace, orgs] = await Promise.all([
+  // Single collectionGroup roundtrip returns every (org, member) pair the
+  // user belongs to — used for both the workspace switcher subtitles and
+  // the active-workspace validation. No more N+1 getMemberDoc loops.
+  const [workspace, orgPairs] = await Promise.all([
     getActiveWorkspace(session.uid),
-    listOrgsForUser(session.uid),
+    listOrgsWithMembershipForUser(session.uid),
   ]);
 
-  // Scope project types by workspace: org workspace → public + that org's
-  // org_only types; personal workspace → public only.
+  // Scope project types + wallet to the active workspace, in parallel.
   const effectiveOrgIds =
     workspace.kind === 'org' ? [workspace.orgId] : [];
-  const featuredTypes = await listProjectTypes({ orgIds: effectiveOrgIds });
-
-  // Wallet balance for the active workspace.
-  const walletBalance = await getTokenBalance({
-    userId: session.uid,
-    orgId: workspace.kind === 'org' ? workspace.orgId : null,
-  });
-
-  // For each org in the switcher, surface the user's role for the
-  // subtitle.
-  const workspaceOrgs = await Promise.all(
-    orgs.map(async (o) => {
-      const member = await getMemberDoc(o.id, session.uid);
-      return {
-        kind: 'org' as const,
-        orgId: o.id,
-        name: o.name,
-        role: member?.role,
-        memberCount: undefined,
-      };
+  const [featuredTypes, walletBalance] = await Promise.all([
+    listProjectTypes({ orgIds: effectiveOrgIds }),
+    getTokenBalance({
+      userId: session.uid,
+      orgId: workspace.kind === 'org' ? workspace.orgId : null,
     }),
-  );
+  ]);
+
+  const workspaceOrgs = orgPairs.map(({ org, member }) => ({
+    kind: 'org' as const,
+    orgId: org.id,
+    name: org.name,
+    role: member.role,
+    memberCount: undefined,
+  }));
 
   return (
     <DashboardLayoutClient
