@@ -101,6 +101,8 @@ export interface CreateProjectInput {
   title: string;
   idea: string;
   userInputs?: Record<string, Record<string, string | number | boolean | null>>;
+  /** Active guideId at start time — pinned for the project's lifetime. */
+  guideId?: string | null;
 }
 
 export async function createProjectDoc(input: CreateProjectInput): Promise<string> {
@@ -121,6 +123,7 @@ export async function createProjectDoc(input: CreateProjectInput): Promise<strin
     totalSections: input.totalSections,
     userInputs: input.userInputs ?? {},
     tokensSpent: 0,
+    guideId: input.guideId ?? null,
     failureReason: null,
     createdAt: now,
     updatedAt: now,

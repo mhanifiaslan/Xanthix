@@ -28,7 +28,12 @@ import {
 } from '@/lib/ai/hydratePrompt';
 import { getAdminFirestore } from '@/lib/firebase/admin';
 import { getMemberDoc } from '@/lib/server/organizations';
+import {
+  findRelevantChunks,
+  getActiveGuideId,
+} from '@/lib/server/projectTypeGuides';
 import type { ProjectDoc } from '@/types/project';
+import type { Section } from '@/types/projectType';
 import type { Locale } from '@/i18n/routing';
 
 // -----------------------------------------------------------------------------
@@ -88,6 +93,10 @@ export async function startProjectAction(
 
   const title = deriveTitle(input.idea);
 
+  // Pin the active guide (if any) at project creation. Re-uploading the
+  // guide later won't shift the ground under this draft.
+  const guideId = await getActiveGuideId(type.id).catch(() => null);
+
   const projectId = await createProjectDoc({
     ownerUid: session.uid,
     orgId,
@@ -98,6 +107,7 @@ export async function startProjectAction(
     title,
     idea: input.idea,
     userInputs: input.userInputs ?? {},
+    guideId,
   });
 
   revalidatePath(`/${locale}/projects`);
@@ -167,14 +177,35 @@ export async function generateNextSectionAction(
     override: section.modelOverride ?? undefined,
   });
 
+  // Retrieve guide context for this specific section. Query is built from
+  // the section's structural metadata (title + description + criteria) so
+  // we get chunks that match the section's intent, not the user's idea.
+  // Failure here is non-fatal — we generate without RAG rather than block.
+  const guideChunks = project.guideId
+    ? await findRelevantChunks({
+        guideId: project.guideId,
+        query: buildGuideQuery(section, project.outputLanguage),
+        limit: 5,
+      }).catch((err) => {
+        console.error(
+          `[rag] findRelevantChunks failed for project=${projectId} section=${section.id}`,
+          err,
+        );
+        return [];
+      })
+    : [];
+
   const userPrompt = hydratePrompt(section, {
     userIdea: project.idea,
     outputLanguage: project.outputLanguage,
     previousSections: previousById,
     userInputs: (project.userInputs?.[section.id] ?? {}) as Record<string, string | number | boolean | null>,
+    guideChunks,
   });
 
-  const systemPrompt = buildSystemPrompt(type);
+  const systemPrompt = buildSystemPrompt(type, {
+    hasGuide: guideChunks.length > 0,
+  });
 
   try {
     const result = await runPrompt({
@@ -304,6 +335,22 @@ export async function reviseSectionAction(
     }
   }
 
+  // Same RAG retrieval as initial generation — revising shouldn't lose the
+  // grounding the original draft had access to.
+  const guideChunks = project.guideId
+    ? await findRelevantChunks({
+        guideId: project.guideId,
+        query: buildGuideQuery(sectionTemplate, project.outputLanguage),
+        limit: 5,
+      }).catch((err) => {
+        console.error(
+          `[rag] findRelevantChunks failed during revise for project=${input.projectId} section=${input.sectionId}`,
+          err,
+        );
+        return [];
+      })
+    : [];
+
   const originalPrompt = hydratePrompt(sectionTemplate, {
     userIdea: project.idea,
     outputLanguage: project.outputLanguage,
@@ -312,6 +359,7 @@ export async function reviseSectionAction(
       string,
       string | number | boolean | null
     >,
+    guideChunks,
   });
 
   const userPrompt = buildRevisionPrompt({
@@ -332,7 +380,7 @@ export async function reviseSectionAction(
   try {
     const result = await runPrompt({
       model,
-      systemPrompt: buildSystemPrompt(type),
+      systemPrompt: buildSystemPrompt(type, { hasGuide: guideChunks.length > 0 }),
       userPrompt,
       outputLanguage: project.outputLanguage,
     });
@@ -388,4 +436,28 @@ function deriveTitle(idea: string): string {
   const firstSentence = cleaned.split(/[.!?]\s/)[0];
   if (firstSentence.length <= 80) return firstSentence;
   return cleaned.slice(0, 70).trimEnd() + '…';
+}
+
+/**
+ * Builds the retrieval query for fetching guide chunks relevant to a
+ * section. We use the section's structural metadata (not the user's idea)
+ * because the guide describes section-by-section expectations — retrieving
+ * by user idea would surface chunks loosely related to the project topic
+ * but unrelated to the section being written.
+ */
+function buildGuideQuery(
+  section: Section,
+  outputLanguage: string,
+): string {
+  const lang = (['tr', 'en', 'es'] as const).includes(
+    outputLanguage as 'tr' | 'en' | 'es',
+  )
+    ? (outputLanguage as 'tr' | 'en' | 'es')
+    : 'en';
+  const parts: string[] = [
+    section.title[lang] ?? section.title.en,
+    section.description[lang] ?? section.description.en,
+    ...(section.criteria ?? []),
+  ];
+  return parts.filter(Boolean).join('\n').slice(0, 1500);
 }

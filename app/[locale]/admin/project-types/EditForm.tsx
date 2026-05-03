@@ -15,6 +15,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  BookOpen,
   Loader2,
   Plus,
   Save,
@@ -142,6 +143,14 @@ export default function EditForm({ initial, mode, locale }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          {mode === 'edit' && (
+            <Link
+              href={`/${locale}/admin/project-types/${initial.id}/guides`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border border-white/10 bg-white/5 text-[var(--color-text-primary)] hover:bg-white/10 transition-colors"
+            >
+              <BookOpen size={14} /> Klavuzlar
+            </Link>
+          )}
           {mode === 'edit' && (
             <button
               type="button"

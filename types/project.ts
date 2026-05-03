@@ -42,6 +42,12 @@ export const projectDocSchema = z.object({
   userInputs: z.record(z.string(), z.record(z.string(), userInputValueSchema)).default({}),
   /** Total tokens spent so far (server-tracked, never trusted from client). */
   tokensSpent: z.number().int().nonnegative().default(0),
+  /**
+   * Snapshot of the project type's active guide (if any) at project start.
+   * Pinned for the project's lifetime so re-uploads of the program guide
+   * mid-flight don't shift the ground under in-progress drafts.
+   */
+  guideId: z.string().nullable().optional(),
   /** Last failure message — surfaced in the UI when status='failed'. */
   failureReason: z.string().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),
