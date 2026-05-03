@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
   // Both confuse Webpack/Turbopack. Keeping them external makes Node use
   // its own runtime resolution so the modules load correctly.
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'iyzipay'],
+  // iyzipay does fs.readdirSync('./lib/resources') at runtime to discover
+  // its API request shapes. Next.js's standalone output only copies files
+  // referenced statically in the import graph, so without this hint the
+  // resources directory gets stripped → ENOENT in production. Force the
+  // entire iyzipay package into the standalone bundle.
+  outputFileTracingIncludes: {
+    '/**': ['./node_modules/iyzipay/**/*'],
+  },
   experimental: {
     // Default Server Action body cap is 1 MB; PDF guide uploads can be up
     // to 15 MB, so bump the runtime ceiling slightly above that.
