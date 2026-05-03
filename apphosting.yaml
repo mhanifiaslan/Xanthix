@@ -117,22 +117,22 @@ env:
       - RUNTIME
 
   # ---------------------------------------------------------------------------
-  # iyzico — payments. Sandbox credentials are public and ship in the codebase
-  # as defaults; production keys go to Secret Manager when the merchant
-  # account is approved. Switch IYZICO_BASE_URL to https://api.iyzipay.com to
-  # flip live.
-  # ---------------------------------------------------------------------------
-  - variable: IYZICO_BASE_URL
-    value: https://sandbox-api.iyzipay.com
-    availability:
-      - RUNTIME
-
-  - variable: IYZICO_API_KEY
-    secret: iyzico-api-key
-    availability:
-      - RUNTIME
-
-  - variable: IYZICO_SECRET_KEY
-    secret: iyzico-secret-key
-    availability:
-      - RUNTIME
+  # iyzico — payments. Disabled in prod until the merchant account is
+  # approved + Secret Manager secrets exist. The billing UI shows a
+  # "soon" badge whenever IYZICO_API_KEY is unset.
+  #
+  # When iyzico is ready:
+  #   1. Create iyzico-api-key + iyzico-secret-key in Secret Manager
+  #   2. Run: firebase apphosting:secrets:grantaccess iyzico-api-key --backend xanthix-eu
+  #   3. Same for iyzico-secret-key
+  #   4. Uncomment the env block below + push
+  #
+  # - variable: IYZICO_BASE_URL
+  #   value: https://sandbox-api.iyzipay.com   # https://api.iyzipay.com for live
+  #   availability: [RUNTIME]
+  # - variable: IYZICO_API_KEY
+  #   secret: iyzico-api-key
+  #   availability: [RUNTIME]
+  # - variable: IYZICO_SECRET_KEY
+  #   secret: iyzico-secret-key
+  #   availability: [RUNTIME]

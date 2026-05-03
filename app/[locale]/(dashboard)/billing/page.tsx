@@ -52,12 +52,15 @@ export default async function BillingPage({
     orgId ? getOrgDoc(orgId) : Promise.resolve(null),
   ]);
 
+  const paymentsEnabled = !!process.env.IYZICO_API_KEY;
+
   return (
     <BillingClient
       locale={locale}
       walletKind={walletKind}
       orgName={orgName}
-      canPurchase={canPurchase}
+      canPurchase={canPurchase && paymentsEnabled}
+      paymentsEnabled={paymentsEnabled}
       balance={balance}
       planLabel={
         walletKind === 'org'

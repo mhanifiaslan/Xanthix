@@ -42,6 +42,9 @@ interface Props {
   walletKind: 'user' | 'org';
   orgName: string | null;
   canPurchase: boolean;
+  /** Distinct from canPurchase: false when the merchant account isn't live
+   *  yet, so the UI shows a "yakında" pill instead of "yetki yok". */
+  paymentsEnabled: boolean;
   balance: number;
   planLabel: string;
   packages: PackageView[];
@@ -93,6 +96,7 @@ export default function BillingClient({
   walletKind,
   orgName,
   canPurchase,
+  paymentsEnabled,
   balance,
   planLabel,
   packages,
@@ -227,7 +231,18 @@ export default function BillingClient({
             </div>
           </div>
 
-          {!canPurchase && walletKind === 'org' && (
+          {!paymentsEnabled ? (
+            <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5 flex items-start gap-3">
+              <Clock
+                size={18}
+                className="text-[var(--color-warning)] mt-0.5 shrink-0"
+              />
+              <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                Ödeme altyapısı yakında devreye giriyor. Bu sırada tokenler
+                manuel olarak yüklenebilir — destek üzerinden iletişime geç.
+              </p>
+            </div>
+          ) : !canPurchase && walletKind === 'org' ? (
             <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-5 flex items-start gap-3">
               <AlertTriangle
                 size={18}
@@ -238,7 +253,7 @@ export default function BillingClient({
                 için kurum yöneticinle iletişime geç.
               </p>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Packages */}
@@ -306,7 +321,11 @@ export default function BillingClient({
                         {isLoading && (
                           <Loader2 size={14} className="animate-spin" />
                         )}
-                        {canPurchase ? 'Satın Al' : 'Yetki Yok'}
+                        {!paymentsEnabled
+                          ? 'Yakında'
+                          : canPurchase
+                            ? 'Satın Al'
+                            : 'Yetki Yok'}
                       </button>
                     </div>
                   </div>
