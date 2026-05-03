@@ -21,6 +21,13 @@ const PUBLIC_PATHS = new Set([
   'forgot',
 ]);
 
+// Cloud Run / Firebase App Hosting forwards traffic to the container on
+// PORT=8080. Without normalization, Next.js bakes that internal port into
+// `request.url`, which then leaks into every redirect Location header — so
+// the browser ends up at https://host:8080/... and times out. Strip these
+// out of any 3xx Location header before returning the response.
+const INTERNAL_PORTS = new Set(['8080', '3000']);
+
 function firstSegmentAfterLocale(pathname: string): string {
   // pathname is always like "/{locale}/..." after the i18n middleware.
   const parts = pathname.split('/').filter(Boolean);
@@ -36,13 +43,66 @@ function isAdminPath(pathname: string) {
   return firstSegmentAfterLocale(pathname) === 'admin';
 }
 
+function publicOriginFromHeaders(request: NextRequest): {
+  host: string | null;
+  proto: string | null;
+} {
+  // Cloud Run / load balancers set these. Use them as the source of truth
+  // when present.
+  return {
+    host: request.headers.get('x-forwarded-host'),
+    proto: request.headers.get('x-forwarded-proto'),
+  };
+}
+
+function normalizeRedirect(
+  response: NextResponse,
+  request: NextRequest,
+): NextResponse {
+  if (response.status < 300 || response.status >= 400) return response;
+
+  const location = response.headers.get('location');
+  if (!location) return response;
+
+  let url: URL;
+  try {
+    // Location may be relative; resolve against the current request URL.
+    url = new URL(location, request.url);
+  } catch {
+    return response;
+  }
+
+  const { host: forwardedHost, proto: forwardedProto } =
+    publicOriginFromHeaders(request);
+
+  let mutated = false;
+  if (forwardedHost && url.host !== forwardedHost) {
+    url.host = forwardedHost;
+    mutated = true;
+  }
+  if (forwardedProto && url.protocol !== `${forwardedProto}:`) {
+    url.protocol = `${forwardedProto}:`;
+    mutated = true;
+  }
+  // Defensive: if there's still an internal port after applying the
+  // forwarded host, drop it.
+  if (INTERNAL_PORTS.has(url.port)) {
+    url.port = '';
+    mutated = true;
+  }
+
+  if (!mutated) return response;
+  response.headers.set('location', url.toString());
+  return response;
+}
+
 export default function proxy(request: NextRequest) {
   const intlResponse = handleI18n(request);
 
   // After i18n, `intlResponse` is either a redirect to add the locale prefix
   // or a passthrough rewrite. We only enforce auth on the latter.
   if (intlResponse.status >= 300 && intlResponse.status < 400) {
-    return intlResponse;
+    return normalizeRedirect(intlResponse, request);
   }
 
   const { pathname } = request.nextUrl;
@@ -56,6 +116,12 @@ export default function proxy(request: NextRequest) {
     if (pathname !== `/${locale}/login`) {
       loginUrl.searchParams.set('next', pathname);
     }
+    // Strip internal port + apply forwarded origin before returning.
+    const { host: forwardedHost, proto: forwardedProto } =
+      publicOriginFromHeaders(request);
+    if (forwardedHost) loginUrl.host = forwardedHost;
+    if (forwardedProto) loginUrl.protocol = `${forwardedProto}:`;
+    if (INTERNAL_PORTS.has(loginUrl.port)) loginUrl.port = '';
     return NextResponse.redirect(loginUrl);
   }
 
