@@ -64,10 +64,11 @@ env:
       - RUNTIME
 
   # Used by invitation acceptUrl + share links. MUST match the public origin
-  # the user actually visits. Switch to https://xanthixai.web.app once that
-  # custom domain is bound to the App Hosting backend.
+  # the user actually visits. Update once a real custom domain (e.g.
+  # xanthix.ai) is bound to the App Hosting backend — App Hosting refuses
+  # .web.app / .firebaseapp.com domains by design.
   - variable: NEXT_PUBLIC_APP_URL
-    value: https://xanthix--xanthixai.us-east4.hosted.app
+    value: https://xanthix-eu--xanthixai.europe-west4.hosted.app
     availability:
       - BUILD
       - RUNTIME
