@@ -11,14 +11,19 @@ const nextConfig: NextConfig = {
   // iyzipay → does dynamic readdirSync + require() of its lib/resources.
   // Both confuse Webpack/Turbopack. Keeping them external makes Node use
   // its own runtime resolution so the modules load correctly.
+  // App Hosting builds with `output: 'standalone'`. Setting it here too
+  // keeps local and prod build behaviour identical so deploy-only bugs
+  // (missing dynamic-loaded files, etc.) surface during local builds.
+  output: 'standalone',
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'iyzipay'],
   // iyzipay does fs.readdirSync('./lib/resources') at runtime to discover
   // its API request shapes. Next.js's standalone output only copies files
   // referenced statically in the import graph, so without this hint the
   // resources directory gets stripped → ENOENT in production. Force the
-  // entire iyzipay package into the standalone bundle.
+  // entire iyzipay package into the standalone bundle. The trailing /*
+  // in the route key is required — bare /** does not match every route.
   outputFileTracingIncludes: {
-    '/**': ['./node_modules/iyzipay/**/*'],
+    '/**/*': ['./node_modules/iyzipay/**/*'],
   },
   experimental: {
     // Default Server Action body cap is 1 MB; PDF guide uploads can be up
