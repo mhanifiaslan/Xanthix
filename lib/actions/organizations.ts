@@ -9,7 +9,7 @@ import {
   type OrgRole,
 } from '@/types/organization';
 import {
-  addOrgMemberByEmail,
+  addOrgMember,
   createOrgDoc,
   getMemberDoc,
   getOrgDoc,
@@ -18,6 +18,16 @@ import {
   setMemberRole,
   setOrgMetadata,
 } from '@/lib/server/organizations';
+import {
+  acceptInvitation,
+  createInvitation,
+  getInvitationByToken,
+  InvitationConsumedError,
+  InvitationEmailMismatchError,
+  InvitationExpiredError,
+  queueInvitationEmail,
+  revokeInvitation,
+} from '@/lib/server/invitations';
 import { getAdminAuth } from '@/lib/firebase/admin';
 
 async function assertManager(orgId: string, uid: string): Promise<OrgRole> {
@@ -110,9 +120,16 @@ const inviteSchema = z.object({
 
 export type InviteMemberInput = z.input<typeof inviteSchema>;
 
+export interface InviteResult {
+  kind: 'added' | 'invited';
+  uid?: string;
+  invitationId?: string;
+  acceptUrl?: string;
+}
+
 export async function inviteOrgMemberAction(
   raw: InviteMemberInput,
-): Promise<{ uid: string }> {
+): Promise<InviteResult> {
   const session = await requireServerSession();
   const input = inviteSchema.parse(raw);
   await assertManager(input.orgId, session.uid);
@@ -125,23 +142,141 @@ export async function inviteOrgMemberAction(
     );
   }
 
+  const auth = getAdminAuth();
+  const targetEmail = input.email.trim().toLowerCase();
+  const userRecord = await auth.getUserByEmail(targetEmail).catch(() => null);
+
+  // Path A — invitee already has a Xanthix account: add directly.
+  if (userRecord) {
+    try {
+      await addOrgMember({
+        orgId: input.orgId,
+        uid: userRecord.uid,
+        email: userRecord.email ?? targetEmail,
+        name: userRecord.displayName ?? null,
+        role: input.role,
+        addedByUid: session.uid,
+      });
+      revalidatePath(`/[locale]/organizations/${input.orgId}`, 'page');
+      return { kind: 'added', uid: userRecord.uid };
+    } catch (err) {
+      if (err instanceof SeatLimitReachedError) {
+        throw new Error(
+          `Koltuk limiti dolu (${err.limit}). Önce limiti yükselt veya bir üyeyi çıkar.`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  // Path B — invitee doesn't exist yet: create a token-bearing invitation
+  // and email them an accept link. Member doc gets created when they sign
+  // up + accept.
+  const invitation = await createInvitation({
+    orgId: input.orgId,
+    email: targetEmail,
+    role: input.role,
+    createdByUid: session.uid,
+  });
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') ?? '';
+  const acceptUrl = `${baseUrl}/tr/invite/${invitation.token}`;
+
+  const inviter = await auth.getUser(session.uid);
+  const org = await getOrgDoc(input.orgId);
+
+  await queueInvitationEmail({
+    toEmail: targetEmail,
+    orgName: org?.name ?? input.orgId,
+    inviterName:
+      inviter.displayName ?? inviter.email ?? session.uid,
+    acceptUrl,
+    expiresAt:
+      typeof invitation.expiresAt === 'string'
+        ? invitation.expiresAt
+        : (invitation.expiresAt ?? new Date()),
+  });
+
+  revalidatePath(`/[locale]/organizations/${input.orgId}`, 'page');
+  return {
+    kind: 'invited',
+    invitationId: invitation.id,
+    acceptUrl,
+  };
+}
+
+const revokeSchema = z.object({
+  orgId: z.string().min(1),
+  invitationId: z.string().min(1),
+});
+
+export async function revokeInvitationAction(
+  raw: z.input<typeof revokeSchema>,
+): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const input = revokeSchema.parse(raw);
+  await assertManager(input.orgId, session.uid);
+  await revokeInvitation(input.orgId, input.invitationId, session.uid);
+  revalidatePath(`/[locale]/organizations/${input.orgId}`, 'page');
+  return { ok: true };
+}
+
+const acceptSchema = z.object({
+  token: z.string().min(20),
+});
+
+export interface AcceptResult {
+  orgId: string;
+  orgName: string;
+  role: OrgRole;
+}
+
+export async function acceptInvitationAction(
+  raw: z.input<typeof acceptSchema>,
+): Promise<AcceptResult> {
+  const session = await requireServerSession();
+  const input = acceptSchema.parse(raw);
+
   try {
-    const result = await addOrgMemberByEmail({
-      orgId: input.orgId,
-      email: input.email,
-      role: input.role,
-      addedByUid: session.uid,
-    });
-    revalidatePath(`/[locale]/organizations/${input.orgId}`, 'page');
+    const result = await acceptInvitation(input.token, session.uid);
+    revalidatePath('/[locale]/organizations', 'layout');
     return result;
   } catch (err) {
-    if (err instanceof SeatLimitReachedError) {
+    if (err instanceof InvitationExpiredError) {
+      throw new Error('Davet süresi dolmuş. Yeniden davet istemen gerek.');
+    }
+    if (err instanceof InvitationConsumedError) {
+      throw new Error('Bu davet artık kullanılamaz.');
+    }
+    if (err instanceof InvitationEmailMismatchError) {
       throw new Error(
-        `Koltuk limiti dolu (${err.limit}). Önce limiti yükselt veya bir üyeyi çıkar.`,
+        'Bu davet farklı bir e-postaya gönderilmiş. O e-posta ile giriş yapıp tekrar dene.',
       );
     }
     throw err;
   }
+}
+
+/**
+ * Public preview of an invitation (no auth required). The accept page uses
+ * this to show "X kurumu sizi davet etti" before the user signs in.
+ */
+export async function previewInvitationAction(token: string) {
+  const found = await getInvitationByToken(token);
+  if (!found) return null;
+  const org = await getOrgDoc(found.orgId);
+  return {
+    orgId: found.orgId,
+    orgName: org?.name ?? found.orgId,
+    email: found.invitation.email,
+    role: found.invitation.role,
+    status: found.invitation.status,
+    expiresAt:
+      typeof found.invitation.expiresAt === 'string'
+        ? found.invitation.expiresAt
+        : found.invitation.expiresAt?.toISOString() ?? null,
+  };
 }
 
 // ----- Change role ----------------------------------------------------------

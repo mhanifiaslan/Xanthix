@@ -3,6 +3,7 @@ import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { getOrgDoc, listMembers, getMemberDoc } from '@/lib/server/organizations';
+import { listPendingInvitations } from '@/lib/server/invitations';
 import { listProjectsByOrg } from '@/lib/server/projects';
 import { routing } from '@/i18n/routing';
 import OrgDetail from './OrgDetail';
@@ -24,12 +25,15 @@ export default async function OrgDetailPage({
   const myMembership = await getMemberDoc(orgId, session.uid);
   if (!myMembership && session.role !== 'super_admin') notFound();
 
-  const [org, members, projects] = await Promise.all([
+  const [org, members, projects, invitations] = await Promise.all([
     getOrgDoc(orgId),
     listMembers(orgId),
     listProjectsByOrg(orgId),
+    listPendingInvitations(orgId),
   ]);
   if (!org) notFound();
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '') ?? '';
 
   return (
     <OrgDetail
@@ -59,6 +63,17 @@ export default async function OrgDetailPage({
         totalSections: p.totalSections,
         tokensSpent: p.tokensSpent,
         projectTypeSlug: p.projectTypeSlug,
+      }))}
+      invitations={invitations.map((inv) => ({
+        id: inv.id,
+        email: inv.email,
+        role: inv.role,
+        token: inv.token,
+        acceptUrl: `${baseUrl}/${locale}/invite/${inv.token}`,
+        expiresAt:
+          typeof inv.expiresAt === 'string'
+            ? inv.expiresAt
+            : inv.expiresAt?.toISOString() ?? null,
       }))}
       myUid={session.uid}
       myRole={myMembership?.role ?? 'viewer'}

@@ -38,3 +38,32 @@ export const orgMemberDocSchema = z.object({
   addedByUid: z.string().nullable().optional(),
 });
 export type OrgMemberDoc = z.infer<typeof orgMemberDocSchema>;
+
+// ---- Invitations ----------------------------------------------------------
+
+export const INVITATION_STATUSES = [
+  'pending',
+  'accepted',
+  'revoked',
+  'expired',
+] as const;
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+
+export const invitationDocSchema = z.object({
+  id: z.string(),
+  /** Always lowercased so we can do case-insensitive uniqueness checks. */
+  email: z.string().email(),
+  role: z.enum(ORG_ROLES),
+  /** Random opaque secret used as the URL-bearer token. */
+  token: z.string().min(20),
+  status: z.enum(INVITATION_STATUSES).default('pending'),
+  createdByUid: z.string(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  /** Hard expiry, even if pending. */
+  expiresAt: z.union([z.string(), z.date()]).optional(),
+  acceptedByUid: z.string().nullable().optional(),
+  acceptedAt: z.union([z.string(), z.date()]).nullable().optional(),
+  revokedByUid: z.string().nullable().optional(),
+  revokedAt: z.union([z.string(), z.date()]).nullable().optional(),
+});
+export type InvitationDoc = z.infer<typeof invitationDocSchema>;

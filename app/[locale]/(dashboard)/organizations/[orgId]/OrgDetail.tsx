@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Building2,
+  CheckCircle2,
+  Copy,
   Crown,
   FolderGit2,
   Loader2,
@@ -18,11 +20,13 @@ import {
   UserCircle,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 import {
   changeMemberRoleAction,
   inviteOrgMemberAction,
   removeMemberAction,
+  revokeInvitationAction,
   transferOwnershipAction,
   updateOrgAction,
 } from '@/lib/actions/organizations';
@@ -68,6 +72,15 @@ interface ProjectView {
   projectTypeSlug: string;
 }
 
+interface InvitationView {
+  id: string;
+  email: string;
+  role: OrgRole;
+  token: string;
+  acceptUrl: string;
+  expiresAt: string | null;
+}
+
 const ROLE_LABEL: Record<OrgRole, string> = {
   owner: 'Sahip',
   admin: 'Admin',
@@ -80,6 +93,7 @@ export default function OrgDetail({
   org,
   members,
   projects,
+  invitations,
   myUid,
   myRole,
 }: {
@@ -87,6 +101,7 @@ export default function OrgDetail({
   org: OrgView;
   members: MemberView[];
   projects: ProjectView[];
+  invitations: InvitationView[];
   myUid: string;
   myRole: OrgRole;
 }) {
@@ -156,6 +171,7 @@ export default function OrgDetail({
           <MembersTab
             org={org}
             members={members}
+            invitations={invitations}
             myUid={myUid}
             isManager={isManager}
             isOwner={isOwner}
@@ -278,6 +294,7 @@ function ProjectsTab({
 function MembersTab({
   org,
   members,
+  invitations,
   myUid,
   isManager,
   isOwner,
@@ -286,6 +303,7 @@ function MembersTab({
 }: {
   org: OrgView;
   members: MemberView[];
+  invitations: InvitationView[];
   myUid: string;
   isManager: boolean;
   isOwner: boolean;
@@ -296,18 +314,29 @@ function MembersTab({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('editor');
   const [error, setError] = useState<string | null>(null);
+  const [latestInvite, setLatestInvite] = useState<{
+    email: string;
+    acceptUrl: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const submitInvite = (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLatestInvite(null);
     startTransition(async () => {
       try {
-        await inviteOrgMemberAction({
+        const result = await inviteOrgMemberAction({
           orgId: org.id,
           email: inviteEmail.trim(),
           role: inviteRole,
         });
+        if (result.kind === 'invited' && result.acceptUrl) {
+          setLatestInvite({
+            email: inviteEmail.trim(),
+            acceptUrl: result.acceptUrl,
+          });
+        }
         setInviteEmail('');
         setShowInvite(false);
         onRefresh();
@@ -393,6 +422,14 @@ function MembersTab({
         </form>
       )}
 
+      {latestInvite && (
+        <LatestInviteBanner
+          email={latestInvite.email}
+          url={latestInvite.acceptUrl}
+          onDismiss={() => setLatestInvite(null)}
+        />
+      )}
+
       <ul className="space-y-2">
         {members.map((m) => (
           <MemberRow
@@ -407,7 +444,186 @@ function MembersTab({
           />
         ))}
       </ul>
+
+      {invitations.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <p className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider px-1">
+            Bekleyen davetler ({invitations.length})
+          </p>
+          <ul className="space-y-2">
+            {invitations.map((inv) => (
+              <PendingInvitationRow
+                key={inv.id}
+                invitation={inv}
+                org={org}
+                isManager={isManager}
+                onRefresh={onRefresh}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
+  );
+}
+
+function LatestInviteBanner({
+  email,
+  url,
+  onDismiss,
+}: {
+  email: string;
+  url: string;
+  onDismiss: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+  return (
+    <div className="bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30 rounded-2xl p-4">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-start gap-2">
+          <Mail size={16} className="text-[var(--color-accent)] mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+              Davet gönderildi
+            </p>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+              <strong>{email}</strong> sistemde kayıtlı değil. Aşağıdaki bağlantıyı
+              ona ileterek davete katılabilir; e-posta uzantısı kuruluysa kendisine
+              de gönderildi.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] shrink-0"
+          aria-label="Kapat"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div className="flex gap-2 items-center mt-3">
+        <input
+          type="text"
+          readOnly
+          value={url}
+          className="flex-1 bg-[var(--color-background)] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-[var(--color-text-secondary)]"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white transition-colors"
+        >
+          {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+          {copied ? 'Kopyalandı' : 'Kopyala'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PendingInvitationRow({
+  invitation,
+  org,
+  isManager,
+  onRefresh,
+}: {
+  invitation: InvitationView;
+  org: OrgView;
+  isManager: boolean;
+  onRefresh: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(invitation.acceptUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const onRevoke = () => {
+    if (!confirm(`Daveti iptal etmek istediğine emin misin? (${invitation.email})`))
+      return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await revokeInvitationAction({
+          orgId: org.id,
+          invitationId: invitation.id,
+        });
+        onRefresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'İptal başarısız.');
+      }
+    });
+  };
+
+  const expiresLabel = invitation.expiresAt
+    ? new Date(invitation.expiresAt).toLocaleDateString('tr-TR', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+      })
+    : '—';
+
+  return (
+    <li className="bg-[var(--color-card)] rounded-2xl border border-dashed border-white/10 p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+          <Mail size={14} className="text-[var(--color-text-secondary)]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
+            {invitation.email}
+          </p>
+          <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+            {ROLE_LABEL[invitation.role]} · davet aktif · son tarih {expiresLabel}
+          </p>
+          {error && (
+            <p className="text-xs text-[var(--color-error)] mt-1">{error}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={copy}
+            disabled={isPending}
+            title="Davet linkini kopyala"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-white/10 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/20 transition-colors"
+          >
+            {copied ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+            {copied ? 'Kopyalandı' : 'Linki kopyala'}
+          </button>
+          {isManager && (
+            <button
+              type="button"
+              onClick={onRevoke}
+              disabled={isPending}
+              title="Daveti iptal et"
+              className="p-1.5 rounded-lg border border-white/10 text-[var(--color-text-secondary)] hover:text-[var(--color-error)] hover:border-[var(--color-error)]/30 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 
