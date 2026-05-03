@@ -1,0 +1,132 @@
+# Firebase App Hosting — Xanthix.ai
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+#
+# - `runConfig` controls the Cloud Run service that serves the Next.js app.
+# - `env` declares variables the build/runtime can see. Plain `value:` entries
+#   are baked into the build (so they're visible to the browser bundle for
+#   NEXT_PUBLIC_* vars). `secret:` entries pull from Google Secret Manager
+#   at runtime — never put real keys in this file.
+#
+# Before the first deploy you'll need to:
+#   1. Create the Secret Manager secrets listed below (Firebase Console → App
+#      Hosting → backend → Secrets, or `gcloud secrets create ...`).
+#   2. Grant the App Hosting compute service account access to each secret.
+#   3. Push to `main` — App Hosting auto-builds.
+
+runConfig:
+  # Single instance is enough for early traffic; scales out automatically.
+  minInstances: 0
+  maxInstances: 5
+  # Per-instance request concurrency. 80 is App Hosting's default and matches
+  # Next.js + Node's typical sweet spot for SSR workloads.
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+env:
+  # ---------------------------------------------------------------------------
+  # Public Firebase config — baked into the client bundle at build time.
+  # ---------------------------------------------------------------------------
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: xanthixai
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: xanthixai.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: xanthixai.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
+    value: default
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_USE_FIREBASE_EMULATOR
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_APP_NAME
+    value: Xanthix.ai
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Used by invitation acceptUrl + share links. MUST match the public origin.
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://xanthixai.web.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ---------------------------------------------------------------------------
+  # Public Firebase keys (kept out of git, pulled from Secret Manager but
+  # marked BUILD so they make it into the static client bundle).
+  # ---------------------------------------------------------------------------
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    secret: firebase-api-key
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    secret: firebase-messaging-sender-id
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    secret: firebase-app-id
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    secret: firebase-measurement-id
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
+    secret: firebase-appcheck-site-key
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # ---------------------------------------------------------------------------
+  # Server-only configuration. App Hosting provides Application Default
+  # Credentials automatically — we don't need a service account JSON here.
+  # ---------------------------------------------------------------------------
+  - variable: VERTEX_AI_LOCATION
+    value: us-central1
+    availability:
+      - RUNTIME
+
+  # ---------------------------------------------------------------------------
+  # Server-only secrets. Add these once Sprint 7 (Stripe) lands; safe to leave
+  # commented while unused.
+  # ---------------------------------------------------------------------------
+  # - variable: STRIPE_SECRET_KEY
+  #   secret: stripe-secret-key
+  #   availability:
+  #     - RUNTIME
+  # - variable: STRIPE_WEBHOOK_SECRET
+  #   secret: stripe-webhook-secret
+  #   availability:
+  #     - RUNTIME
+  # - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  #   secret: stripe-publishable-key
+  #   availability:
+  #     - BUILD
+  #     - RUNTIME
