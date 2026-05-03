@@ -42,6 +42,7 @@ interface ScorecardView {
   maxScore: number;
   normalizedScore: number;
   passed: boolean;
+  attempts: number;
   dimensions: ScorecardDimensionView[];
 }
 
@@ -386,11 +387,15 @@ function ScorecardPanel({ scorecard }: { scorecard: ScorecardView }) {
     scorecard.totalScore % 1 === 0
       ? scorecard.totalScore.toString()
       : scorecard.totalScore.toFixed(1);
+  const attemptsLabel =
+    scorecard.attempts > 1
+      ? `${scorecard.attempts}. denemede`
+      : null;
 
   return (
     <details className={`mt-5 rounded-xl border ${tone} group`}>
       <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-wrap">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
             Değerlendirme
           </span>
@@ -405,6 +410,11 @@ function ScorecardPanel({ scorecard }: { scorecard: ScorecardView }) {
           ) : (
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-warning)]">
               Eşik altı
+            </span>
+          )}
+          {attemptsLabel && (
+            <span className="text-[10px] text-[var(--color-text-secondary)] tabular-nums">
+              {attemptsLabel}
             </span>
           )}
         </div>
@@ -720,6 +730,7 @@ function parseScorecard(raw: unknown): ScorecardView | null {
           ? r.totalScore / r.maxScore
           : 0,
     passed: !!r.passed,
+    attempts: typeof r.attempts === 'number' && r.attempts > 0 ? r.attempts : 1,
     dimensions: r.dimensions
       .filter((d): d is Record<string, unknown> => !!d && typeof d === 'object')
       .map((d) => ({

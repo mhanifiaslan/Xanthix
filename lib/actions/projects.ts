@@ -23,6 +23,7 @@ import {
 import { pickModel, runPrompt, paiTokensFor } from '@/lib/ai/router';
 import { judgeSection } from '@/lib/ai/judge';
 import {
+  buildJudgeRevisionPrompt,
   buildRevisionPrompt,
   buildSystemPrompt,
   hydratePrompt,
@@ -209,67 +210,161 @@ export async function generateNextSectionAction(
   });
 
   try {
-    const result = await runPrompt({
+    // Initial generation (attempt 1).
+    const initial = await runPrompt({
       model,
       systemPrompt,
       userPrompt,
       outputLanguage: project.outputLanguage,
     });
-
-    const cost = paiTokensFor({
+    let bestText = initial.text;
+    let bestMeta = initial;
+    let writerCostTotal = paiTokensFor({
       model,
-      tokensIn: result.tokensIn,
-      tokensOut: result.tokensOut,
+      tokensIn: initial.tokensIn,
+      tokensOut: initial.tokensOut,
     });
 
     await spendTokens({
       userId: session.uid,
       orgId: project.orgId ?? null,
-      amount: cost,
+      amount: writerCostTotal,
       reason: `generate:${type.slug}:${section.id}`,
       relatedProjectId: projectId,
       relatedSectionId: section.id,
     });
 
-    // Optional rubric pass (Phase 8B.1: score only, no auto-revise yet).
-    // Failure here is non-fatal — we still ship the section, just without
-    // a scorecard. This lets us calibrate judge prompts on real data
-    // before turning the loop on in 8B.2.
+    // Judge → revise loop. Only runs when the section has a rubric AND the
+    // first judge pass scores below threshold AND maxRevisionAttempts > 0.
+    //
+    // Bookkeeping notes:
+    //  - `scorecard` always reflects the LAST successful judge pass; if a
+    //    later judge throws, we keep the prior pass's scorecard rather
+    //    than overwriting with null.
+    //  - `attempts` counts how many writer passes ran (1 = no revise, 2
+    //    = one revise, etc.). The scorecard's attempts field is set
+    //    explicitly at persist time.
+    //  - Each writer call and each judge call gets its own spendTokens
+    //    row so the audit log stays granular.
+    //  - Wall-time worst case: 2 revises = 6 LLM calls (3 writer + 3
+    //    judge). At ~20s/call that's ~2 minutes — within Cloud Run's
+    //    default 5min ceiling but tight. If we ever brush it, split the
+    //    judge loop into a follow-up Server Action.
     let scorecard: Awaited<ReturnType<typeof judgeSection>> | null = null;
+    let judgeCostTotal = 0;
+    let attemptsRun = 1;
+
     if (section.rubric) {
+      const rubric = section.rubric;
+      const judgeContext = {
+        projectTypeName: type.name.en,
+        sectionTitle:
+          section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ??
+          section.title.en,
+        sectionDescription:
+          section.description[project.outputLanguage as 'tr' | 'en' | 'es'] ??
+          section.description.en,
+        outputLanguage: project.outputLanguage,
+      };
+      const maxAttempts = 1 + Math.max(0, rubric.maxRevisionAttempts ?? 0);
+
       try {
         scorecard = await judgeSection({
-          content: result.text,
-          rubric: section.rubric,
+          content: bestText,
+          rubric,
           tier: type.tier,
-          context: {
-            projectTypeName: type.name.en,
-            sectionTitle:
-              section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ??
-              section.title.en,
-            sectionDescription:
-              section.description[project.outputLanguage as 'tr' | 'en' | 'es'] ??
-              section.description.en,
-            outputLanguage: project.outputLanguage,
-          },
+          context: judgeContext,
         });
-
+        judgeCostTotal += scorecard.judgePaiTokensCharged;
         await spendTokens({
           userId: session.uid,
           orgId: project.orgId ?? null,
           amount: scorecard.judgePaiTokensCharged,
-          reason: `judge:${type.slug}:${section.id}`,
+          reason: `judge:${type.slug}:${section.id}:1`,
           relatedProjectId: projectId,
           relatedSectionId: section.id,
         });
+
+        // Auto-revise while we're below threshold and have attempts left.
+        while (
+          scorecard &&
+          !scorecard.passed &&
+          attemptsRun < maxAttempts
+        ) {
+          attemptsRun += 1;
+
+          const revisePrompt = buildJudgeRevisionPrompt({
+            originalPrompt: userPrompt,
+            currentContent: bestText,
+            scorecardDimensions: scorecard.dimensions,
+            attemptNumber: attemptsRun,
+            outputLanguage: project.outputLanguage,
+          });
+
+          const revised = await runPrompt({
+            model,
+            systemPrompt,
+            userPrompt: revisePrompt,
+            outputLanguage: project.outputLanguage,
+          });
+          const reviseCost = paiTokensFor({
+            model,
+            tokensIn: revised.tokensIn,
+            tokensOut: revised.tokensOut,
+          });
+          writerCostTotal += reviseCost;
+          bestText = revised.text;
+          bestMeta = revised;
+
+          await spendTokens({
+            userId: session.uid,
+            orgId: project.orgId ?? null,
+            amount: reviseCost,
+            reason: `revise:${type.slug}:${section.id}:${attemptsRun}`,
+            relatedProjectId: projectId,
+            relatedSectionId: section.id,
+          });
+
+          // Re-judge the new draft. If the judge call itself fails, keep
+          // the previous scorecard rather than nulling everything out;
+          // the user still benefits from the first pass's diagnostics.
+          try {
+            const nextScorecard = await judgeSection({
+              content: bestText,
+              rubric,
+              tier: type.tier,
+              context: judgeContext,
+            });
+            judgeCostTotal += nextScorecard.judgePaiTokensCharged;
+            await spendTokens({
+              userId: session.uid,
+              orgId: project.orgId ?? null,
+              amount: nextScorecard.judgePaiTokensCharged,
+              reason: `judge:${type.slug}:${section.id}:${attemptsRun}`,
+              relatedProjectId: projectId,
+              relatedSectionId: section.id,
+            });
+            scorecard = nextScorecard;
+          } catch (err) {
+            console.error(
+              `[judge] revise-judge attempt=${attemptsRun} failed for project=${projectId} section=${section.id}`,
+              err,
+            );
+            // Loop exits because we can't tell if the revision passed.
+            break;
+          }
+        }
       } catch (err) {
         console.error(
-          `[judge] failed for project=${projectId} section=${section.id}`,
+          `[judge] initial pass failed for project=${projectId} section=${section.id}`,
           err,
         );
         scorecard = null;
       }
     }
+
+    // Stamp the final attempts count so the UI can show "3. denemede 4.5/5".
+    if (scorecard) scorecard.attempts = attemptsRun;
 
     await recordGeneratedSection({
       projectId,
@@ -277,16 +372,25 @@ export async function generateNextSectionAction(
       arrayIndex: currentIndex,
       order: section.order,
       title: section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
-      content: result.text,
+      content: bestText,
       outputType: section.outputType,
       generationMeta: {
-        model: result.modelId,
-        tokensIn: result.tokensIn,
-        tokensOut: result.tokensOut,
-        durationMs: result.durationMs,
-        paiTokensCharged: cost,
+        model: bestMeta.modelId,
+        tokensIn: bestMeta.tokensIn,
+        tokensOut: bestMeta.tokensOut,
+        // durationMs reflects the LAST writer call only; if we tracked
+        // total wall time the UI's per-section timing would be misleading.
+        durationMs: bestMeta.durationMs,
+        // paiTokensCharged reflects ALL writer attempts so the project
+        // total stays accurate.
+        paiTokensCharged: writerCostTotal,
       },
-      scorecard,
+      // Override scorecard.judgePaiTokensCharged with the SUM of every
+      // judge call (the field on a single Scorecard tracks one call;
+      // here we want the section total for display.tokensSpent math).
+      scorecard: scorecard
+        ? { ...scorecard, judgePaiTokensCharged: judgeCostTotal }
+        : null,
     });
 
     await appendAssistantMessage(

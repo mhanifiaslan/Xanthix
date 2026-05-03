@@ -203,6 +203,69 @@ function pickLocalized(
   return loc.en;
 }
 
+interface BuildJudgeRevisionPromptArgs {
+  /** The fully-hydrated original generation prompt (post-{{guideContext}}). */
+  originalPrompt: string;
+  /** The draft we want to improve. */
+  currentContent: string;
+  /** Per-dimension feedback from the previous judge pass. Empty
+   *  rationale/suggestions skipped silently. */
+  scorecardDimensions: Array<{
+    id: string;
+    score: number;
+    maxPoints: number;
+    rationale: string;
+    suggestions: string;
+  }>;
+  /** Which attempt this is (1-indexed; 2 means "first revise"). Surfaced
+   *  to the model so it knows it has been here before. */
+  attemptNumber: number;
+  outputLanguage: string;
+}
+
+/**
+ * Builds the auto-revise prompt that runs after a sub-threshold judge pass.
+ * Differs from buildRevisionPrompt (user-driven) in two ways:
+ *  - Driver is the judge's per-dimension suggestions, not user instruction
+ *  - Tone is "fix specifically these gaps", not "respond to this request"
+ *
+ * The prompt asks for a full rewrite (not a diff) so the next judge pass
+ * can score the whole thing against the rubric without diffing logic.
+ */
+export function buildJudgeRevisionPrompt(
+  args: BuildJudgeRevisionPromptArgs,
+): string {
+  const feedbackLines = args.scorecardDimensions
+    .filter((d) => d.suggestions.trim() || d.score < d.maxPoints)
+    .map((d) => {
+      const scoreFrag = `${d.score % 1 === 0 ? d.score : d.score.toFixed(1)}/${d.maxPoints}`;
+      const rationale = d.rationale.trim()
+        ? ` Eksik: ${d.rationale.trim()}`
+        : '';
+      const suggestions = d.suggestions.trim()
+        ? ` Yapılması gereken: ${d.suggestions.trim()}`
+        : '';
+      return `- ${d.id} (${scoreFrag}).${rationale}${suggestions}`;
+    })
+    .join('\n');
+
+  return [
+    '## Original task',
+    args.originalPrompt,
+    '',
+    '## Previous draft',
+    '```',
+    args.currentContent,
+    '```',
+    '',
+    `## Reviewer feedback (attempt ${args.attemptNumber - 1} scored below threshold)`,
+    feedbackLines || '(No specific feedback — rewrite for clarity and concreteness.)',
+    '',
+    '## Output instructions',
+    `Rewrite the section in full so the reviewer's gaps above are closed. Do NOT mention the feedback in the output. Keep the same structure and Markdown rules. Output language: ${args.outputLanguage}. Output ONLY the revised section, no commentary.`,
+  ].join('\n');
+}
+
 /**
  * Builds the user prompt for a section revision. Wraps the original task,
  * the current content, and the user's revision instruction in a structure
