@@ -63,9 +63,11 @@ env:
       - BUILD
       - RUNTIME
 
-  # Used by invitation acceptUrl + share links. MUST match the public origin.
+  # Used by invitation acceptUrl + share links. MUST match the public origin
+  # the user actually visits. Switch to https://xanthixai.web.app once that
+  # custom domain is bound to the App Hosting backend.
   - variable: NEXT_PUBLIC_APP_URL
-    value: https://xanthixai.web.app
+    value: https://xanthix--xanthixai.us-east4.hosted.app
     availability:
       - BUILD
       - RUNTIME
