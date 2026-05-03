@@ -1,6 +1,11 @@
 import 'server-only';
-import Iyzipay from 'iyzipay';
 import { getIyzipay } from './client';
+
+// Iyzipay's PAYMENT_GROUP.PRODUCT constant resolves to the literal string
+// 'PRODUCT' (see node_modules/iyzipay/lib/Iyzipay.js). Inlining it lets us
+// avoid a static `import Iyzipay from 'iyzipay'` here, which keeps the
+// package out of the bundle graph until getIyzipay() runs.
+const PAYMENT_GROUP_PRODUCT = 'PRODUCT' as const;
 
 /**
  * iyzipay's API is callback-style; these promisified wrappers keep the call
@@ -62,7 +67,7 @@ export interface InitializeResult {
 export async function initializeCheckoutForm(
   args: InitializeArgs,
 ): Promise<InitializeResult> {
-  const sdk = getIyzipay();
+  const sdk = await getIyzipay();
 
   // @types/iyzipay incorrectly reuses the 3DS payment request shape here
   // and demands `paymentCard` + `installments` even though the hosted
@@ -74,7 +79,7 @@ export async function initializeCheckoutForm(
     paidPrice: args.paidPrice.toFixed(2),
     currency: args.currency,
     basketId: args.conversationId,
-    paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
+    paymentGroup: PAYMENT_GROUP_PRODUCT,
     callbackUrl: args.callbackUrl,
     buyer: args.buyer,
     shippingAddress: {
@@ -139,7 +144,7 @@ export interface RetrieveResult {
 export async function retrieveCheckoutForm(
   token: string,
 ): Promise<RetrieveResult> {
-  const sdk = getIyzipay();
+  const sdk = await getIyzipay();
   return new Promise((resolve, reject) => {
     sdk.checkoutForm.retrieve(
       { token, locale: 'TR' },

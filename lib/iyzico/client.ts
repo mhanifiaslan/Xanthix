@@ -1,12 +1,17 @@
 import 'server-only';
-import Iyzipay from 'iyzipay';
+import type Iyzipay from 'iyzipay';
 
 let _client: Iyzipay | null = null;
 
+/** Truthy when both iyzico secrets are present in the environment. */
+export function isIyzicoConfigured(): boolean {
+  return !!process.env.IYZICO_API_KEY && !!process.env.IYZICO_SECRET_KEY;
+}
+
 /**
- * Returns a process-wide iyzipay client. We default to sandbox so the very
- * first deploy doesn't hit production accidentally; switching to live is a
- * single env var change once the merchant account is approved.
+ * Returns a process-wide iyzipay client. The package itself is loaded with
+ * a dynamic import so the constructor (which does fs.readdirSync on the
+ * package's own lib/resources/) only runs when credentials are present.
  *
  * Required env vars:
  *   IYZICO_API_KEY           — sandbox starts with "sandbox-..."
@@ -14,7 +19,7 @@ let _client: Iyzipay | null = null;
  *   IYZICO_BASE_URL          — https://sandbox-api.iyzipay.com (test) or
  *                              https://api.iyzipay.com (live)
  */
-export function getIyzipay(): Iyzipay {
+export async function getIyzipay(): Promise<Iyzipay> {
   if (_client) return _client;
 
   const apiKey = process.env.IYZICO_API_KEY;
@@ -23,16 +28,30 @@ export function getIyzipay(): Iyzipay {
     process.env.IYZICO_BASE_URL ?? 'https://sandbox-api.iyzipay.com';
 
   if (!apiKey || !secretKey) {
-    throw new Error(
+    throw new PaymentsDisabledError(
       'iyzico credentials missing — set IYZICO_API_KEY and IYZICO_SECRET_KEY.',
     );
   }
 
-  _client = new Iyzipay({ apiKey, secretKey, uri: baseUrl });
+  const { default: IyzipayCtor } = await import('iyzipay');
+  _client = new IyzipayCtor({ apiKey, secretKey, uri: baseUrl });
   return _client;
 }
 
 export function isLiveMode(): boolean {
   const baseUrl = process.env.IYZICO_BASE_URL ?? '';
   return baseUrl.includes('api.iyzipay.com') && !baseUrl.includes('sandbox');
+}
+
+/**
+ * Thrown when an iyzico-dependent code path runs but credentials aren't
+ * configured. Callers (server actions, route handlers) should catch this
+ * and surface a "payments disabled" message rather than a 500.
+ */
+export class PaymentsDisabledError extends Error {
+  readonly code = 'PAYMENTS_DISABLED';
+  constructor(message = 'Payments are not configured on this environment.') {
+    super(message);
+    this.name = 'PaymentsDisabledError';
+  }
 }

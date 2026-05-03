@@ -5,6 +5,7 @@ import {
   markPurchaseFailed,
 } from '@/lib/server/purchases';
 import { retrieveCheckoutForm } from '@/lib/iyzico/checkout';
+import { isIyzicoConfigured } from '@/lib/iyzico/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,13 @@ export const dynamic = 'force-dynamic';
  * through `applySuccessfulPurchase` which guards against double-credit.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!isIyzicoConfigured()) {
+    return NextResponse.json(
+      { ok: false, reason: 'payments-disabled' },
+      { status: 503 },
+    );
+  }
+
   const purchaseId = request.nextUrl.searchParams.get('purchaseId');
   if (!purchaseId) return redirectTo(request, 'error');
 

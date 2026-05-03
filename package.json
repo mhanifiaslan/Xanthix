@@ -28,7 +28,6 @@
     "exceljs": "^4.4.0",
     "firebase": "^11.4.0",
     "firebase-admin": "^13.1.0",
-    "iyzipay": "^2.0.67",
     "lucide-react": "^1.8.0",
     "nanoid": "^5.0.9",
     "next": "16.2.4",
@@ -42,6 +41,9 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
+  },
+  "optionalDependencies": {
+    "iyzipay": "^2.0.67"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

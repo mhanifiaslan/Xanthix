@@ -14,6 +14,7 @@ import {
 } from '@/lib/server/purchases';
 import { getAdminAuth } from '@/lib/firebase/admin';
 import { initializeCheckoutForm } from '@/lib/iyzico/checkout';
+import { isIyzicoConfigured } from '@/lib/iyzico/client';
 
 const checkoutInputSchema = z.object({
   packageId: z.string().min(1),
@@ -36,6 +37,14 @@ export interface CheckoutResult {
 export async function createTokenCheckoutAction(
   rawInput: unknown,
 ): Promise<CheckoutResult> {
+  if (!isIyzicoConfigured()) {
+    // Surfaced as a toast on /billing — UI also disables the buttons in
+    // this state, so this is a defense-in-depth check for direct callers.
+    throw new Error(
+      'Ödeme altyapısı henüz aktif değil. Lütfen daha sonra tekrar deneyin.',
+    );
+  }
+
   const { packageId } = checkoutInputSchema.parse(rawInput);
   const session = await requireServerSession();
 

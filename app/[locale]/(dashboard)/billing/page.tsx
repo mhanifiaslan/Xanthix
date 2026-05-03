@@ -10,6 +10,7 @@ import {
 import { getTokenBalance } from '@/lib/server/projects';
 import { getOrgDoc, getMemberDoc } from '@/lib/server/organizations';
 import { ORG_MANAGER_ROLES } from '@/types/organization';
+import { isIyzicoConfigured } from '@/lib/iyzico/client';
 import BillingClient from './BillingClient';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +53,7 @@ export default async function BillingPage({
     orgId ? getOrgDoc(orgId) : Promise.resolve(null),
   ]);
 
-  const paymentsEnabled = !!process.env.IYZICO_API_KEY;
+  const paymentsEnabled = isIyzicoConfigured();
 
   return (
     <BillingClient

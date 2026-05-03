@@ -6,6 +6,7 @@ import {
   markPurchaseFailed,
 } from '@/lib/server/purchases';
 import { retrieveCheckoutForm } from '@/lib/iyzico/checkout';
+import { isIyzicoConfigured } from '@/lib/iyzico/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,13 @@ const webhookBodySchema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!isIyzicoConfigured()) {
+    return NextResponse.json(
+      { ok: false, reason: 'payments-disabled' },
+      { status: 503 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
