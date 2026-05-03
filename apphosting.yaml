@@ -117,19 +117,22 @@ env:
       - RUNTIME
 
   # ---------------------------------------------------------------------------
-  # Server-only secrets. Add these once Sprint 7 (Stripe) lands; safe to leave
-  # commented while unused.
+  # iyzico — payments. Sandbox credentials are public and ship in the codebase
+  # as defaults; production keys go to Secret Manager when the merchant
+  # account is approved. Switch IYZICO_BASE_URL to https://api.iyzipay.com to
+  # flip live.
   # ---------------------------------------------------------------------------
-  # - variable: STRIPE_SECRET_KEY
-  #   secret: stripe-secret-key
-  #   availability:
-  #     - RUNTIME
-  # - variable: STRIPE_WEBHOOK_SECRET
-  #   secret: stripe-webhook-secret
-  #   availability:
-  #     - RUNTIME
-  # - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  #   secret: stripe-publishable-key
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
+  - variable: IYZICO_BASE_URL
+    value: https://sandbox-api.iyzipay.com
+    availability:
+      - RUNTIME
+
+  - variable: IYZICO_API_KEY
+    secret: iyzico-api-key
+    availability:
+      - RUNTIME
+
+  - variable: IYZICO_SECRET_KEY
+    secret: iyzico-secret-key
+    availability:
+      - RUNTIME

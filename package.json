@@ -16,7 +16,8 @@
     "admin:set-role": "node scripts/set-admin-claim.mjs",
     "admin:grant-tokens": "node scripts/grant-tokens.mjs",
     "admin:grant-org-tokens": "node scripts/grant-org-tokens.mjs",
-    "seed:project-types": "tsx scripts/seed-project-types.ts"
+    "seed:project-types": "tsx scripts/seed-project-types.ts",
+    "seed:token-packages": "tsx scripts/seed-token-packages.ts"
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.12.0",
@@ -27,6 +28,7 @@
     "exceljs": "^4.4.0",
     "firebase": "^11.4.0",
     "firebase-admin": "^13.1.0",
+    "iyzipay": "^2.0.67",
     "lucide-react": "^1.8.0",
     "nanoid": "^5.0.9",
     "next": "16.2.4",
@@ -44,14 +46,15 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.19",
-    "dotenv": "^17.4.2",
-    "tsx": "^4.21.0",
+    "@types/iyzipay": "^2.0.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

@@ -8,10 +8,10 @@ const nextConfig: NextConfig = {
   // locale-aware navigation helpers from `@/i18n/navigation`.
   typedRoutes: false,
   // pdf-parse → pdfjs-dist tries to load its worker via dynamic import;
-  // the bundler can't resolve the worker chunk it ends up looking for.
-  // Keeping these packages external makes Node use their own runtime
-  // resolution so the worker file is found correctly.
-  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+  // iyzipay → does dynamic readdirSync + require() of its lib/resources.
+  // Both confuse Webpack/Turbopack. Keeping them external makes Node use
+  // its own runtime resolution so the modules load correctly.
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'iyzipay'],
   experimental: {
     // Default Server Action body cap is 1 MB; PDF guide uploads can be up
     // to 15 MB, so bump the runtime ceiling slightly above that.
