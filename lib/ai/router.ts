@@ -27,6 +27,11 @@ interface ConcreteModel {
   costOutPer1M: number;
 }
 
+/** Public read-only view of a model — used by callers that need to pass it
+ *  back into runPrompt() or paiTokensFor() without redefining the shape. */
+export type ConcreteModelView = ConcreteModel;
+export type { ProjectTier } from '@/types/projectType';
+
 const MODELS: Record<ModelTag, ConcreteModel> = {
   flash: {
     tag: 'flash',
@@ -71,6 +76,17 @@ export function pickModel(opts: {
 }): ConcreteModel {
   const tag = opts.override ?? TIER_DEFAULT[opts.tier];
   return MODELS[tag];
+}
+
+/**
+ * Picks a model for the judge pass. Same as pickModel for standard+ tiers,
+ * but escalates economy → pro: Flash judging Flash gives unreliable scores
+ * (the judge inherits the writer's blind spots), and the cost difference
+ * for one judge call is small enough to swallow.
+ */
+export function pickJudgeModel(opts: { tier: ProjectTier }): ConcreteModel {
+  if (opts.tier === 'economy') return MODELS.pro;
+  return MODELS[TIER_DEFAULT[opts.tier]];
 }
 
 export interface RunPromptInput {

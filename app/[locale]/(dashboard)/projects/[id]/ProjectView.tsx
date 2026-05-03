@@ -29,6 +29,22 @@ import { requestExportAction } from '@/lib/actions/exports';
 import Markdown from '@/components/shared/Markdown';
 import GanttView from '@/components/shared/GanttView';
 
+interface ScorecardDimensionView {
+  id: string;
+  score: number;
+  maxPoints: number;
+  rationale: string;
+  suggestions: string;
+}
+
+interface ScorecardView {
+  totalScore: number;
+  maxScore: number;
+  normalizedScore: number;
+  passed: boolean;
+  dimensions: ScorecardDimensionView[];
+}
+
 interface SectionView {
   id: string;
   order: number;
@@ -37,6 +53,7 @@ interface SectionView {
   outputType: string;
   status: 'pending' | 'generating' | 'ready' | 'revising' | 'failed';
   failureReason: string | null;
+  scorecard: ScorecardView | null;
 }
 
 interface ProjectView {
@@ -112,6 +129,7 @@ export default function ProjectView({
           outputType: data.outputType ?? 'markdown',
           status: data.status ?? 'pending',
           failureReason: data.failureReason ?? null,
+          scorecard: parseScorecard(data.scorecard),
         };
       });
       setSections(next);
@@ -351,10 +369,83 @@ function SectionCard({
           <Markdown>{section.content}</Markdown>
         )}
       </div>
+      {section.scorecard && <ScorecardPanel scorecard={section.scorecard} />}
       {canRevise && (
         <ReviseSectionInline projectId={projectId} sectionId={section.id} />
       )}
     </li>
+  );
+}
+
+function ScorecardPanel({ scorecard }: { scorecard: ScorecardView }) {
+  const pct = Math.round(scorecard.normalizedScore * 100);
+  const tone = scorecard.passed
+    ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/5'
+    : 'border-[var(--color-warning)]/30 bg-[var(--color-warning)]/5';
+  const totalLabel =
+    scorecard.totalScore % 1 === 0
+      ? scorecard.totalScore.toString()
+      : scorecard.totalScore.toFixed(1);
+
+  return (
+    <details className={`mt-5 rounded-xl border ${tone} group`}>
+      <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+            Değerlendirme
+          </span>
+          <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+            {totalLabel} / {scorecard.maxScore}
+          </span>
+          <span className="text-xs text-[var(--color-text-secondary)]">{pct}%</span>
+          {scorecard.passed ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-success)]">
+              ✓ Geçer
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-warning)]">
+              Eşik altı
+            </span>
+          )}
+        </div>
+        <span className="text-[var(--color-text-secondary)] text-xs group-open:rotate-180 transition-transform">
+          ▾
+        </span>
+      </summary>
+      <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
+        {scorecard.dimensions.map((d) => {
+          const dimPct = d.maxPoints > 0 ? (d.score / d.maxPoints) * 100 : 0;
+          return (
+            <div key={d.id} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-[var(--color-text-primary)] capitalize">
+                  {d.id}
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)] tabular-nums">
+                  {d.score % 1 === 0 ? d.score : d.score.toFixed(1)} / {d.maxPoints}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full bg-[var(--color-accent)] transition-all"
+                  style={{ width: `${dimPct}%` }}
+                />
+              </div>
+              {d.rationale && (
+                <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                  {d.rationale}
+                </p>
+              )}
+              {d.suggestions && (
+                <p className="text-xs text-[var(--color-accent)] leading-relaxed">
+                  💡 {d.suggestions}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 
@@ -607,4 +698,36 @@ function RetryButton({ projectId }: { projectId: string }) {
       Tekrar dene
     </button>
   );
+}
+
+function parseScorecard(raw: unknown): ScorecardView | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (
+    typeof r.totalScore !== 'number' ||
+    typeof r.maxScore !== 'number' ||
+    !Array.isArray(r.dimensions)
+  ) {
+    return null;
+  }
+  return {
+    totalScore: r.totalScore,
+    maxScore: r.maxScore,
+    normalizedScore:
+      typeof r.normalizedScore === 'number'
+        ? r.normalizedScore
+        : r.maxScore > 0
+          ? r.totalScore / r.maxScore
+          : 0,
+    passed: !!r.passed,
+    dimensions: r.dimensions
+      .filter((d): d is Record<string, unknown> => !!d && typeof d === 'object')
+      .map((d) => ({
+        id: String(d.id ?? ''),
+        score: typeof d.score === 'number' ? d.score : 0,
+        maxPoints: typeof d.maxPoints === 'number' ? d.maxPoints : 5,
+        rationale: typeof d.rationale === 'string' ? d.rationale : '',
+        suggestions: typeof d.suggestions === 'string' ? d.suggestions : '',
+      })),
+  };
 }

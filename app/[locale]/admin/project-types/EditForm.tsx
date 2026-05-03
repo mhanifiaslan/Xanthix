@@ -584,6 +584,8 @@ function SectionEditor({
 
       <UserInputFieldsEditor sectionIndex={index} control={control} register={register} />
 
+      <RubricEditor sectionIndex={index} control={control} register={register} />
+
       {errors && Object.keys(errors).length > 0 && (
         <p className="text-xs text-[var(--color-error)]">
           Bu bölümde doğrulama hataları var (alanları kontrol et).
@@ -656,6 +658,190 @@ function UserInputFieldsEditor({
             />
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+// ---- Rubric editor --------------------------------------------------------
+//
+// Rubrics drive the judge pass after a section is generated. Each dimension
+// is scored 0..maxPoints by a 2nd LLM call; the section gets a scorecard
+// surfaced in the user UI. Empty (no dimensions) → no judging happens.
+
+function RubricEditor({
+  sectionIndex,
+  control,
+  register,
+}: {
+  sectionIndex: number;
+  control: Control<FormValues>;
+  register: UseFormRegister<FormValues>;
+}) {
+  const dimensions = useFieldArray({
+    control,
+    name: `sections.${sectionIndex}.rubric.dimensions` as never,
+  });
+
+  const enabled = dimensions.fields.length > 0;
+
+  const enable = () => {
+    dimensions.append({
+      id: 'excellence',
+      name: { tr: 'Mükemmellik', en: 'Excellence', es: 'Excelencia' },
+      descriptor: {
+        tr: '5: Tam, somut, kanıt-bazlı; 3: Yeterli; 1: Belirsiz veya konu dışı.',
+        en: '5: Complete, concrete, evidence-driven; 3: Adequate; 1: Vague or off-topic.',
+        es: '5: Completo, concreto, basado en evidencia; 3: Adecuado; 1: Vago o fuera de tema.',
+      },
+      maxPoints: 5,
+    } as never);
+  };
+
+  const disable = () => {
+    // Remove every dimension; an empty array means no rubric → no judging.
+    while (dimensions.fields.length > 0) {
+      dimensions.remove(0);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+            Değerlendirme Rubric'i
+          </p>
+          <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">
+            AI üretimden sonra çıktıyı bu boyutlara göre puanlar; kullanıcı skoru
+            görür. Boş bırakırsan yargı yapılmaz.
+          </p>
+        </div>
+        {enabled ? (
+          <button
+            type="button"
+            onClick={disable}
+            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
+          >
+            Rubric'i kapat
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={enable}
+            className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+          >
+            <Plus size={12} /> Rubric ekle
+          </button>
+        )}
+      </div>
+
+      {enabled && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="Geçer eşiği"
+              hint="Toplam puanın oranı, 0-1 arası (örn 0.7 = %70)"
+            >
+              <input
+                type="number"
+                step="0.05"
+                min={0}
+                max={1}
+                {...register(
+                  `sections.${sectionIndex}.rubric.passingThreshold` as const,
+                  { valueAsNumber: true },
+                )}
+                className={inputCls}
+                placeholder="0.7"
+              />
+            </Field>
+            <Field
+              label="Maks. otomatik revize"
+              hint="8B.2'de devreye girer; şimdilik kayıt amaçlı"
+            >
+              <input
+                type="number"
+                min={0}
+                max={3}
+                {...register(
+                  `sections.${sectionIndex}.rubric.maxRevisionAttempts` as const,
+                  { valueAsNumber: true },
+                )}
+                className={inputCls}
+                placeholder="2"
+              />
+            </Field>
+          </div>
+
+          <div className="space-y-2">
+            {dimensions.fields.map((d, di) => (
+              <div
+                key={d.id}
+                className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2"
+              >
+                <div className="grid grid-cols-3 gap-2">
+                  <Field label="ID">
+                    <input
+                      {...register(
+                        `sections.${sectionIndex}.rubric.dimensions.${di}.id` as const,
+                      )}
+                      className={inputCls}
+                      placeholder="excellence"
+                    />
+                  </Field>
+                  <Field label="Maks puan">
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      {...register(
+                        `sections.${sectionIndex}.rubric.dimensions.${di}.maxPoints` as const,
+                        { valueAsNumber: true },
+                      )}
+                      className={inputCls}
+                    />
+                  </Field>
+                  <div className="flex items-end justify-end">
+                    <IconButton
+                      onClick={() => dimensions.remove(di)}
+                      title="Boyutu sil"
+                      tone="danger"
+                    >
+                      <Trash2 size={14} />
+                    </IconButton>
+                  </div>
+                </div>
+                <LocalizedField
+                  label="İsim"
+                  register={register}
+                  namePrefix={`sections.${sectionIndex}.rubric.dimensions.${di}.name`}
+                />
+                <LocalizedField
+                  label="Skorlama açıklaması"
+                  multiline
+                  register={register}
+                  namePrefix={`sections.${sectionIndex}.rubric.dimensions.${di}.descriptor`}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              dimensions.append({
+                id: `dim-${dimensions.fields.length + 1}`,
+                name: { tr: '', en: '', es: '' },
+                descriptor: { tr: '', en: '', es: '' },
+                maxPoints: 5,
+              } as never)
+            }
+            className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+          >
+            <Plus size={12} /> Boyut ekle
+          </button>
+        </>
       )}
     </div>
   );

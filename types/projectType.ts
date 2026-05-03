@@ -63,6 +63,32 @@ const userInputSchemaSchema = z.object({
     .default([]),
 });
 
+// A formal evaluation rubric (Horizon's Excellence/Impact/Implementation,
+// TÜBİTAK 1507's "yenilik/özgün değer" axes, etc.). When present on a
+// section, the AI's draft is judged against each dimension and a
+// scorecard is persisted alongside the section content. This is the
+// machine-checkable analogue to `criteria` (which is just a prompt hint).
+const rubricDimensionSchema = z.object({
+  id: z.string().min(1),
+  name: localizedString,
+  // Plain-language scoring rubric, e.g. "5: Outstanding clarity, references
+  // EU green deal goals; 3: Adequate; 1: Vague or off-topic". The judge
+  // model uses this to anchor its scores, so be specific.
+  descriptor: localizedString,
+  maxPoints: z.number().int().positive().max(20),
+});
+
+const rubricSchema = z.object({
+  dimensions: z.array(rubricDimensionSchema).min(1).max(8),
+  // Pass threshold as a fraction of total possible (e.g. 0.7 = 70%).
+  passingThreshold: z.number().min(0).max(1).default(0.7),
+  // How many revise attempts the auto-loop is allowed when the score is
+  // below threshold. 0 means judge-only (record score, never revise).
+  // Phase 8B.1 ships with the loop disabled in code regardless; this
+  // field is wired for 8B.2.
+  maxRevisionAttempts: z.number().int().min(0).max(3).default(2),
+});
+
 export const sectionSchema = z.object({
   id: z.string().min(1),
   order: z.number().int().nonnegative(),
@@ -71,6 +97,7 @@ export const sectionSchema = z.object({
   // Mustache-style placeholders accepted: {{userIdea}}, {{section.summary}}, ...
   agentPromptTemplate: z.string().min(20),
   criteria: z.array(z.string().min(1)).default([]),
+  rubric: rubricSchema.nullish(),
   outputType: z.enum(SECTION_OUTPUT_TYPES).default('markdown'),
   modelOverride: z.enum(MODEL_OVERRIDES).nullish(),
   // True when the wizard should pause and collect extra info from the user
@@ -81,6 +108,8 @@ export const sectionSchema = z.object({
   estimatedTokens: z.number().int().positive().nullish(),
 });
 export type Section = z.infer<typeof sectionSchema>;
+export type Rubric = z.infer<typeof rubricSchema>;
+export type RubricDimension = z.infer<typeof rubricDimensionSchema>;
 
 export const projectTypeSchema = z.object({
   id: z.string().min(1),

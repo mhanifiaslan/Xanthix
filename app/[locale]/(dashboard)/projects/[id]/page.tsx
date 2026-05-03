@@ -66,6 +66,7 @@ export default async function ProjectPage({
         outputType: s.outputType,
         status: s.status,
         failureReason: s.failureReason ?? null,
+        scorecard: s.scorecard ?? null,
       }))}
     />
   );

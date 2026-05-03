@@ -152,6 +152,8 @@ export interface RecordGeneratedSectionInput {
   content: string;
   outputType: string;
   generationMeta: NonNullable<SectionDoc['generationMeta']>;
+  /** Optional rubric scorecard from the judge pass. Persisted as-is. */
+  scorecard?: NonNullable<SectionDoc['scorecard']> | null;
 }
 
 export async function recordGeneratedSection(
@@ -172,6 +174,7 @@ export async function recordGeneratedSection(
       content: input.content,
       outputType: input.outputType,
       generationMeta: input.generationMeta,
+      scorecard: input.scorecard ?? null,
       failureReason: null,
       createdAt: now,
       updatedAt: now,
@@ -181,10 +184,19 @@ export async function recordGeneratedSection(
     const nextIndex = input.arrayIndex + 1;
     const allDone = nextIndex >= total;
 
+    // Caller is responsible for spendTokens() — both for the writer call
+    // and (if judging happened) for the judge call separately. We just
+    // mirror the writer cost into the project.tokensSpent display field.
+    // Judge cost is mirrored when the caller passes scorecard so the
+    // display total matches the wallet ledger.
+    const displayDelta =
+      input.generationMeta.paiTokensCharged +
+      (input.scorecard?.judgePaiTokensCharged ?? 0);
+
     tx.update(projectRef, {
       currentSectionIndex: allDone ? total : nextIndex,
       status: allDone ? 'ready' : 'generating',
-      tokensSpent: FieldValue.increment(input.generationMeta.paiTokensCharged),
+      tokensSpent: FieldValue.increment(displayDelta),
       updatedAt: now,
     });
   });

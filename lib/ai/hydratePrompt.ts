@@ -1,4 +1,4 @@
-import type { Section, ProjectType } from '@/types/projectType';
+import type { Rubric, Section, ProjectType } from '@/types/projectType';
 import type { GuideChunkHit } from '@/types/projectTypeGuide';
 
 export interface HydrateContext {
@@ -112,6 +112,95 @@ export function buildSystemPrompt(
   }
 
   return lines.join(' ');
+}
+
+// ---- Judge / scorecard prompts --------------------------------------------
+
+/**
+ * System prompt for the judge model. Independent of the writer system
+ * prompt because the judge is grading, not generating — different role,
+ * different temperature, different output contract.
+ */
+export function buildJudgeSystemPrompt(): string {
+  return [
+    'You are a strict grant-program reviewer scoring a section of a funding application.',
+    'You score against the rubric exactly as written — never invent dimensions or shift weights.',
+    'Be honest: a high score must be earned. Average drafts deserve middle scores.',
+    'Output strict JSON matching the schema in the user message. No prose, no markdown fences.',
+  ].join(' ');
+}
+
+interface BuildJudgePromptArgs {
+  content: string;
+  rubric: Rubric;
+  projectTypeName: string;
+  sectionTitle: string;
+  sectionDescription: string;
+  outputLanguage: string;
+}
+
+/**
+ * Builds the user prompt for the judge. The contract is intentionally
+ * verbose about the JSON shape because Gemini's jsonMode is strict but
+ * not psychic — we still need to spell out every field name.
+ *
+ * The rationale + suggestions strings are written in `outputLanguage` so
+ * end users can read the scorecard naturally; field names stay English
+ * for parser stability.
+ */
+export function buildJudgePrompt(args: BuildJudgePromptArgs): string {
+  const lang = args.outputLanguage;
+
+  const dimensionLines = args.rubric.dimensions
+    .map((d) => {
+      const name = pickLocalized(d.name, lang);
+      const desc = pickLocalized(d.descriptor, lang);
+      return `- id: "${d.id}" (max ${d.maxPoints} pts) — ${name}\n  Scoring guide: ${desc}`;
+    })
+    .join('\n');
+
+  const exampleDimensions = args.rubric.dimensions
+    .map(
+      (d) =>
+        `    {"id": "${d.id}", "score": <0..${d.maxPoints}>, "rationale": "<short ${lang} text>", "suggestions": "<short ${lang} text — what would lift this dimension>"}`,
+    )
+    .join(',\n');
+
+  return [
+    `Project type: ${args.projectTypeName}`,
+    `Section: ${args.sectionTitle}`,
+    `Section purpose: ${args.sectionDescription}`,
+    '',
+    '## Rubric',
+    dimensionLines,
+    '',
+    '## Section draft to score',
+    '```',
+    args.content,
+    '```',
+    '',
+    '## Output format (strict JSON, no fences)',
+    '{',
+    '  "dimensions": [',
+    exampleDimensions,
+    '  ]',
+    '}',
+    '',
+    'Rules:',
+    `- Score every dimension listed above. Use only ids that appeared in the rubric.`,
+    `- Score must be an integer or .5 increment between 0 and the dimension's maxPoints.`,
+    `- Rationale: 1-3 sentences in ${lang}, citing concrete passages of the draft.`,
+    `- Suggestions: 1-2 sentences in ${lang} on what would raise this dimension's score. Empty string if it's already at max.`,
+    '- Do not include any text outside the JSON object.',
+  ].join('\n');
+}
+
+function pickLocalized(
+  loc: { tr: string; en: string; es: string },
+  lang: string,
+): string {
+  if (lang === 'tr' || lang === 'en' || lang === 'es') return loc[lang];
+  return loc.en;
 }
 
 /**

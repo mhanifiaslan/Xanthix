@@ -56,6 +56,36 @@ export const projectDocSchema = z.object({
 export type ProjectDoc = z.infer<typeof projectDocSchema>;
 export type ProjectDocInput = z.input<typeof projectDocSchema>;
 
+// Per-dimension judge result. Persisted alongside generated sections so
+// the UI can show "Excellence: 4.2/5 — strong on X, weak on Y".
+const scorecardDimensionSchema = z.object({
+  id: z.string(),
+  score: z.number(),
+  maxPoints: z.number().int().positive(),
+  rationale: z.string().default(''),
+  suggestions: z.string().default(''),
+});
+
+const scorecardSchema = z.object({
+  totalScore: z.number(),
+  maxScore: z.number().positive(),
+  // Convenience: totalScore / maxScore. Pre-computed so list views don't
+  // need to re-derive it.
+  normalizedScore: z.number().min(0).max(1),
+  passed: z.boolean(),
+  // 1 for the initial generation; bumps by 1 per auto-revise (8B.2). Today
+  // it's always 1 because the loop is disabled.
+  attempts: z.number().int().positive().default(1),
+  // Judge model + token cost for transparency.
+  judgeModel: z.string(),
+  judgeTokensIn: z.number().int().nonnegative().default(0),
+  judgeTokensOut: z.number().int().nonnegative().default(0),
+  judgePaiTokensCharged: z.number().int().nonnegative().default(0),
+  dimensions: z.array(scorecardDimensionSchema).min(1),
+});
+export type Scorecard = z.infer<typeof scorecardSchema>;
+export type ScorecardDimension = z.infer<typeof scorecardDimensionSchema>;
+
 export const sectionDocSchema = z.object({
   id: z.string(),
   order: z.number().int().nonnegative(),
@@ -73,6 +103,7 @@ export const sectionDocSchema = z.object({
     })
     .nullable()
     .optional(),
+  scorecard: scorecardSchema.nullable().optional(),
   failureReason: z.string().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),
   updatedAt: z.union([z.string(), z.date()]).optional(),

@@ -21,6 +21,7 @@ import {
   spendTokens,
 } from '@/lib/server/projects';
 import { pickModel, runPrompt, paiTokensFor } from '@/lib/ai/router';
+import { judgeSection } from '@/lib/ai/judge';
 import {
   buildRevisionPrompt,
   buildSystemPrompt,
@@ -230,6 +231,46 @@ export async function generateNextSectionAction(
       relatedSectionId: section.id,
     });
 
+    // Optional rubric pass (Phase 8B.1: score only, no auto-revise yet).
+    // Failure here is non-fatal — we still ship the section, just without
+    // a scorecard. This lets us calibrate judge prompts on real data
+    // before turning the loop on in 8B.2.
+    let scorecard: Awaited<ReturnType<typeof judgeSection>> | null = null;
+    if (section.rubric) {
+      try {
+        scorecard = await judgeSection({
+          content: result.text,
+          rubric: section.rubric,
+          tier: type.tier,
+          context: {
+            projectTypeName: type.name.en,
+            sectionTitle:
+              section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ??
+              section.title.en,
+            sectionDescription:
+              section.description[project.outputLanguage as 'tr' | 'en' | 'es'] ??
+              section.description.en,
+            outputLanguage: project.outputLanguage,
+          },
+        });
+
+        await spendTokens({
+          userId: session.uid,
+          orgId: project.orgId ?? null,
+          amount: scorecard.judgePaiTokensCharged,
+          reason: `judge:${type.slug}:${section.id}`,
+          relatedProjectId: projectId,
+          relatedSectionId: section.id,
+        });
+      } catch (err) {
+        console.error(
+          `[judge] failed for project=${projectId} section=${section.id}`,
+          err,
+        );
+        scorecard = null;
+      }
+    }
+
     await recordGeneratedSection({
       projectId,
       sectionId: section.id,
@@ -245,6 +286,7 @@ export async function generateNextSectionAction(
         durationMs: result.durationMs,
         paiTokensCharged: cost,
       },
+      scorecard,
     });
 
     await appendAssistantMessage(
