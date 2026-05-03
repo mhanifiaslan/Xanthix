@@ -17,7 +17,8 @@
     "admin:grant-tokens": "node scripts/grant-tokens.mjs",
     "admin:grant-org-tokens": "node scripts/grant-org-tokens.mjs",
     "seed:project-types": "tsx scripts/seed-project-types.ts",
-    "seed:token-packages": "tsx scripts/seed-token-packages.ts"
+    "seed:token-packages": "tsx scripts/seed-token-packages.ts",
+    "smoke:rag": "tsx scripts/smoke-rag.ts"
   },
   "dependencies": {
     "@google-cloud/vertexai": "^1.12.0",

@@ -85,6 +85,21 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---- Project Type Guides (RAG source PDFs + chunks) ----------------
+    // Reference docs that ground AI generation. The PDFs themselves live in
+    // Storage; this collection holds metadata + per-chunk vectors for
+    // findNearest queries. All client-visible reads are admin-only because
+    // chunk text can contain proprietary call documents; section generation
+    // happens server-side and reads via the Admin SDK (rules-bypass).
+    match /projectTypeGuides/{guideId} {
+      allow read: if isAdmin();
+      allow write: if false; // server-only mutations via Admin SDK
+      match /chunks/{chunkId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
     // The user's allowed org ids (best-effort; optimization later via custom claims).
     function getUserOrgIds() {
       return isSignedIn() && request.auth.token.orgIds is list

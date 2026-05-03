@@ -102,7 +102,37 @@
         { "fieldPath": "active", "order": "ASCENDING" },
         { "fieldPath": "currency", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "projectTypeGuides",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "projectTypeId", "order": "ASCENDING" },
+        { "fieldPath": "active", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "projectTypeGuides",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "projectTypeId", "order": "ASCENDING" },
+        { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+      ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "chunks",
+      "fieldPath": "embedding",
+      "indexes": [
+        {
+          "queryScope": "COLLECTION",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
+    }
+  ]
 }
