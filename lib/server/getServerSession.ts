@@ -49,3 +49,12 @@ export async function requireServerSession(): Promise<ServerSession> {
   if (!session) throw new Error('Unauthorized');
   return session;
 }
+
+export async function requireAdminSession(): Promise<ServerSession> {
+  const session = await getServerSession();
+  if (!session) throw new Error('Unauthorized');
+  if (session.role !== 'admin' && session.role !== 'super_admin') {
+    throw new Error('Forbidden: admin access required');
+  }
+  return session;
+}

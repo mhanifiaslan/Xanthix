@@ -27,7 +27,9 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
 
   if (!snap.exists) {
     const WELCOME_BONUS = 500;
-    await ref.set({
+    const batch = db.batch();
+    
+    batch.set(ref, {
       uid: decoded.uid,
       email: decoded.email ?? null,
       name: decoded.name ?? decoded.email?.split('@')[0] ?? null,
@@ -41,7 +43,8 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
       lastLoginAt: FieldValue.serverTimestamp(),
     });
 
-    await db.collection('tokenTransactions').add({
+    const txRef = db.collection('tokenTransactions').doc();
+    batch.set(txRef, {
       userId: decoded.uid,
       type: 'bonus',
       amount: WELCOME_BONUS,
@@ -49,6 +52,8 @@ export async function provisionUserAction({ idToken, locale }: ProvisionInput) {
       reason: 'welcome',
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    await batch.commit();
 
     return { created: true };
   }

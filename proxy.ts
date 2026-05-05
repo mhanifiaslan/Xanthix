@@ -85,8 +85,8 @@ function normalizeRedirect(
     mutated = true;
   }
   // Defensive: if there's still an internal port after applying the
-  // forwarded host, drop it.
-  if (INTERNAL_PORTS.has(url.port)) {
+  // forwarded host, drop it. Do not drop in local development.
+  if (process.env.NODE_ENV !== 'development' && INTERNAL_PORTS.has(url.port)) {
     url.port = '';
     mutated = true;
   }
@@ -121,7 +121,9 @@ export default function proxy(request: NextRequest) {
       publicOriginFromHeaders(request);
     if (forwardedHost) loginUrl.host = forwardedHost;
     if (forwardedProto) loginUrl.protocol = `${forwardedProto}:`;
-    if (INTERNAL_PORTS.has(loginUrl.port)) loginUrl.port = '';
+    if (process.env.NODE_ENV !== 'development' && INTERNAL_PORTS.has(loginUrl.port)) {
+      loginUrl.port = '';
+    }
     return NextResponse.redirect(loginUrl);
   }
 

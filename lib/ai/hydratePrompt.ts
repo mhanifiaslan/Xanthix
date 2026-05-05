@@ -36,24 +36,61 @@ export interface HydrateContext {
  * model still has them in context. This makes RAG opt-out (set the
  * placeholder to "" in the template) but on by default.
  */
+export function sanitizeUserInput(input: string): string {
+  if (typeof input !== 'string') return '';
+  // Length limit: 10,000 characters
+  let sanitized = input.slice(0, 10000);
+  
+  // Blacklist phrases
+  const blacklist = [
+    /ignore previous/ig,
+    /ignore all previous/ig,
+    /system:/ig,
+    /assistant:/ig,
+    /you are now/ig,
+    /forget everything/ig
+  ];
+  
+  for (const regex of blacklist) {
+    sanitized = sanitized.replace(regex, '[REDACTED]');
+  }
+  
+  return sanitized;
+}
+
 export function hydratePrompt(section: Section, ctx: HydrateContext): string {
   let out = section.agentPromptTemplate;
 
-  out = out.replace(/\{\{userIdea\}\}/g, ctx.userIdea);
+  const sanitizedUserIdea = sanitizeUserInput(ctx.userIdea);
+  out = out.replace(/\{\{userIdea\}\}/g, sanitizedUserIdea);
   out = out.replace(/\{\{outputLanguage\}\}/g, ctx.outputLanguage);
+
+  const sanitizedPreviousSections = Object.fromEntries(
+    Object.entries(ctx.previousSections).map(([k, v]) => [
+      k, 
+      { title: sanitizeUserInput(v.title), content: sanitizeUserInput(v.content) }
+    ])
+  );
+
+  const sanitizedUserInputs = Object.fromEntries(
+    Object.entries(ctx.userInputs).map(([k, v]) => {
+      if (typeof v === 'string') return [k, sanitizeUserInput(v)];
+      return [k, v];
+    })
+  );
 
   out = out.replace(
     /\{\{previousSections\}\}/g,
-    JSON.stringify(ctx.previousSections, null, 2),
+    JSON.stringify(sanitizedPreviousSections, null, 2),
   );
   out = out.replace(
     /\{\{userInputs\}\}/g,
-    JSON.stringify(ctx.userInputs, null, 2),
+    JSON.stringify(sanitizedUserInputs, null, 2),
   );
 
   out = out.replace(
     /\{\{previousSections\.([a-zA-Z0-9_-]+)\}\}/g,
-    (_, id: string) => ctx.previousSections[id]?.content ?? '',
+    (_, id: string) => sanitizedPreviousSections[id]?.content ?? '',
   );
 
   const guideBlock = formatGuideContext(ctx.guideChunks ?? []);
@@ -62,6 +99,13 @@ export function hydratePrompt(section: Section, ctx: HydrateContext): string {
   if (!hadPlaceholder && guideBlock) {
     out = `${out}\n\n## Kılavuz alıntıları (referans olarak kullan)\n\n${guideBlock}`;
   }
+
+  // Wrap final user inputs in XML-like tags to further isolate from system instructions
+  out = `
+<user_input>
+${out}
+</user_input>
+`.trim();
 
   return out;
 }

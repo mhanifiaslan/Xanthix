@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
-import EditForm from '../EditForm';
+import WizardEditForm from '../WizardEditForm';
 import type { ProjectTypeWriteInput } from '@/types/projectType';
 
 export const dynamic = 'force-dynamic';
@@ -48,5 +48,5 @@ export default async function AdminProjectTypeNewPage({
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  return <EditForm initial={BLANK} mode="create" locale={locale} />;
+  return <WizardEditForm initial={BLANK} mode="create" locale={locale} />;
 }

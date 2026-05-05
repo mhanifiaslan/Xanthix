@@ -264,3 +264,39 @@ export async function draftFromGuidePdfAction(
 
   return draftFromGuideAction({ guide: trimmed, hintLanguage });
 }
+
+// ----- Prompt Tester --------------------------------------------------------
+
+const testPromptSchema = z.object({
+  systemPrompt: z.string(),
+  userPrompt: z.string(),
+  outputLanguage: z.enum(['tr', 'en', 'es', 'auto']).default('tr'),
+  modelOverride: z.enum(['flash', 'pro', 'sonnet', 'opus']).optional(),
+});
+
+export type TestPromptInput = z.input<typeof testPromptSchema>;
+
+export async function testPromptAction(raw: TestPromptInput) {
+  const session = await requireServerSession();
+  assertAdmin(session.role);
+  const input = testPromptSchema.parse(raw);
+
+  const model = pickModel({
+    tier: 'standard',
+    override: input.modelOverride || 'flash',
+  });
+
+  try {
+    const result = await runPrompt({
+      model,
+      systemPrompt: input.systemPrompt,
+      userPrompt: input.userPrompt,
+      outputLanguage: input.outputLanguage,
+    });
+    
+    return { success: true, text: result.text, tokensIn: result.tokensIn, tokensOut: result.tokensOut };
+  } catch (err) {
+    console.error('[testPromptAction] failed', err);
+    return { success: false, error: err instanceof Error ? err.message : 'Prompt testi başarısız oldu.' };
+  }
+}

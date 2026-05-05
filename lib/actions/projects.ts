@@ -607,3 +607,152 @@ function buildGuideQuery(
   ];
   return parts.filter(Boolean).join('\n').slice(0, 1500);
 }
+
+// -----------------------------------------------------------------------------
+// Idea Enhancement
+// -----------------------------------------------------------------------------
+
+const enhanceIdeaSchema = z.object({
+  idea: z.string().min(5).max(1000),
+  outputLanguage: z.string().default('tr'),
+});
+
+export async function enhanceIdeaAction(rawInput: z.input<typeof enhanceIdeaSchema>): Promise<{ enhancedIdea: string }> {
+  // We require a session, but we don't necessarily charge tokens for this tiny action
+  // since it's meant to be a frictionless UX helper. Or we could charge 1 token.
+  await requireServerSession();
+  const input = enhanceIdeaSchema.parse(rawInput);
+
+  const systemPrompt = `You are an expert grant writer and project manager. The user will provide a brief, potentially incomplete project idea. Your task is to expand and enhance this idea into a professional, well-structured, and comprehensive project description (around 3-4 sentences). Do NOT add extra pleasantries, just return the enhanced idea text. Write in the requested language.`;
+  
+  const userPrompt = `Language: ${input.outputLanguage}\n\nOriginal Idea:\n${input.idea}`;
+
+  const result = await runPrompt({
+    model: pickModel({ tier: 'standard' }), // Gemini Pro
+    systemPrompt,
+    userPrompt,
+    outputLanguage: input.outputLanguage,
+  });
+
+  return { enhancedIdea: result.text.trim() };
+}
+
+// -----------------------------------------------------------------------------
+// Manual Edit Saving
+// -----------------------------------------------------------------------------
+
+const saveSectionContentSchema = z.object({
+  projectId: z.string().min(1),
+  sectionId: z.string().min(1),
+  content: z.string().min(1),
+});
+
+export async function saveSectionContentAction(rawInput: z.input<typeof saveSectionContentSchema>): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const input = saveSectionContentSchema.parse(rawInput);
+
+  const project = await getProjectDoc(input.projectId);
+  if (!project) throw new Error('Project not found');
+  if (!(await canActOnProject(project, session))) {
+    throw new Error('Forbidden');
+  }
+
+  const sectionRef = getAdminFirestore()
+    .collection('projects')
+    .doc(input.projectId)
+    .collection('sections')
+    .doc(input.sectionId);
+    
+  await sectionRef.update({
+    content: input.content,
+    updatedAt: new Date().toISOString(),
+  });
+
+  return { ok: true };
+}
+
+// -----------------------------------------------------------------------------
+// Manual Evaluation (Scorecard Update)
+// -----------------------------------------------------------------------------
+
+const evaluateSectionSchema = z.object({
+  projectId: z.string().min(1),
+  sectionId: z.string().min(1),
+});
+
+export async function evaluateSectionAction(rawInput: z.input<typeof evaluateSectionSchema>): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const input = evaluateSectionSchema.parse(rawInput);
+
+  const project = await getProjectDoc(input.projectId);
+  if (!project) throw new Error('Project not found');
+  if (!(await canActOnProject(project, session))) {
+    throw new Error('Forbidden');
+  }
+
+  const sectionRef = getAdminFirestore()
+    .collection('projects')
+    .doc(input.projectId)
+    .collection('sections')
+    .doc(input.sectionId);
+    
+  const sectionSnap = await sectionRef.get();
+  if (!sectionSnap.exists) throw new Error('Section not found');
+  const sectionDocData = sectionSnap.data() as {
+    content?: string;
+    scorecard?: any;
+  };
+  
+  const content = sectionDocData.content;
+  if (!content) {
+    throw new Error('Değerlendirilecek içerik bulunamadı.');
+  }
+
+  const type = await getProjectTypeById(project.projectTypeId);
+  if (!type) throw new Error('Project type missing');
+  
+  const sectionTemplate = type.sections.find((s) => s.id === input.sectionId);
+  if (!sectionTemplate) throw new Error('Section template not found');
+  
+  if (!sectionTemplate.rubric) {
+    throw new Error('Bu bölüm için değerlendirme kriteri (rubric) bulunmuyor.');
+  }
+
+  // Bare-minimum upfront check on the wallet that will pay for it.
+  const balance = await getTokenBalance({ userId: session.uid, orgId: project.orgId ?? null });
+  if (balance < 1) {
+    throw new InsufficientTokensError(balance, 1);
+  }
+
+  const judgeContext = {
+    projectTypeName: type.name.en,
+    sectionTitle: sectionTemplate.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? sectionTemplate.title.en,
+    sectionDescription: sectionTemplate.description[project.outputLanguage as 'tr' | 'en' | 'es'] ?? sectionTemplate.description.en,
+    outputLanguage: project.outputLanguage,
+  };
+
+  const nextScorecard = await judgeSection({
+    content: content,
+    rubric: sectionTemplate.rubric,
+    tier: type.tier,
+    context: judgeContext,
+  });
+
+  const attempts = (sectionDocData.scorecard?.attempts ?? 0) + 1;
+  const finalScorecard = { ...nextScorecard, attempts };
+
+  await spendTokens({
+    userId: session.uid,
+    orgId: project.orgId ?? null,
+    amount: nextScorecard.judgePaiTokensCharged,
+    reason: `evaluate:${type.slug}:${input.sectionId}`,
+    relatedProjectId: input.projectId,
+    relatedSectionId: input.sectionId,
+  });
+
+  await sectionRef.update({
+    scorecard: finalScorecard,
+  });
+
+  return { ok: true };
+}

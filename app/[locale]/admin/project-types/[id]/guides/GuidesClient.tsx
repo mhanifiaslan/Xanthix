@@ -206,57 +206,90 @@ export default function GuidesClient({
       <div className="px-8 py-8 max-w-4xl mx-auto space-y-8">
         {/* Upload form */}
         <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Upload size={18} className="text-[var(--color-accent)]" />
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-              Yeni klavuz yükle
-            </h2>
+          <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+            <div className="w-10 h-10 rounded-xl bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 flex items-center justify-center">
+              <Upload size={18} className="text-[var(--color-accent)]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[var(--color-text-primary)]">
+                Yeni Kılavuz Yükle
+              </h2>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
+                RAG arama motoru için PDF dökümanını sisteme tanıtın
+              </p>
+            </div>
           </div>
 
           <div className="space-y-3">
-            <label className="block">
-              <span className="text-xs font-medium text-[var(--color-text-secondary)] block mb-1.5">
-                Başlık
-              </span>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Horizon Europe Cluster 4 — 2026 Çağrı Dökümanı"
-                className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:outline-none focus:border-[var(--color-accent)]/50"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-xs font-medium text-[var(--color-text-secondary)] block mb-1.5">
-                PDF dosyası (max 15 MB)
-              </span>
-              <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-5 flex items-center gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-6 items-start">
+              <label className="block w-full">
+                <span className="text-sm font-medium text-[var(--color-text-secondary)] block mb-2">
+                  Kılavuz Başlığı
+                </span>
                 <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
-                  className="text-xs text-[var(--color-text-secondary)] file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-[var(--color-accent)] file:text-white file:text-xs file:cursor-pointer cursor-pointer"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Örn: TUBITAK 1507 - 2026 Çağrısı"
+                  className="w-full rounded-xl bg-black/20 border border-white/10 px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/50 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] transition-all"
                 />
-                {file && (
-                  <button
-                    type="button"
-                    onClick={() => onFileChosen(null)}
-                    className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                    aria-label="Dosyayı temizle"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              {file && (
-                <p className="text-xs text-[var(--color-text-secondary)] mt-1.5">
-                  Seçildi: <span className="text-[var(--color-text-primary)]">{file.name}</span>{' '}
-                  ({(file.size / 1024).toFixed(0)} KB)
-                </p>
-              )}
-            </label>
+              </label>
+
+              <label className="block w-full">
+                <span className="text-sm font-medium text-[var(--color-text-secondary)] block mb-2">
+                  PDF Dosyası (Maks 15 MB)
+                </span>
+                <div className={`relative rounded-xl border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center p-6 text-center ${
+                  file ? 'border-[var(--color-accent)]/50 bg-[var(--color-accent)]/5' : 'border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]'
+                }`}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  
+                  {file ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-12 h-12 rounded-full bg-[var(--color-success)]/20 flex items-center justify-center mb-1">
+                        <CheckCircle2 size={24} className="text-[var(--color-success)]" />
+                      </div>
+                      <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-secondary)]">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onFileChosen(null);
+                        }}
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--color-danger)]/10 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/20 text-xs font-semibold transition-colors relative z-10"
+                      >
+                        <Trash2 size={14} /> Dosyayı Kaldır
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
+                        <Upload size={24} className="text-[var(--color-text-secondary)]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                          PDF yüklemek için tıklayın veya sürükleyin
+                        </p>
+                        <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                          Sadece .pdf formatında, maksimum 15MB
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
 
             <label className="flex items-start gap-2 cursor-pointer pt-1">
               <input

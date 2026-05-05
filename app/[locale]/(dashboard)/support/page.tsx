@@ -1,17 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { MessageSquare, Mail, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { mockTickets } from "@/lib/mock-admin";
-
-const myTickets = mockTickets.filter((t) => t.userId === "u1");
-
-const statusCfg = {
-  beklemede: { label: "Beklemede", icon: Clock, color: "text-[var(--color-warning)] bg-[var(--color-warning)]/10 border-[var(--color-warning)]/20" },
-  yanitlandi: { label: "Yanitlandi", icon: MessageSquare, color: "text-[var(--color-accent)] bg-[var(--color-accent)]/10 border-[var(--color-accent)]/20" },
-  cozuldu: { label: "Cozuldu", icon: CheckCircle2, color: "text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20" },
-};
+import { useState } from 'react';
+import { MessageSquare, Mail, CheckCircle2, Clock } from 'lucide-react';
 
 export default function SupportPage() {
   const [subject, setSubject] = useState("");
@@ -103,30 +93,6 @@ export default function SupportPage() {
             </form>
           )}
         </div>
-
-        {/* Acik Talepler */}
-        {myTickets.length > 0 && (
-          <div>
-            <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-4">Acik Taleplerim</h2>
-            <div className="space-y-3">
-              {myTickets.map((ticket) => {
-                const s = statusCfg[ticket.status];
-                const StatusIcon = s.icon;
-                return (
-                  <div key={ticket.id} className="flex items-center justify-between p-4 bg-[var(--color-card)] rounded-xl border border-white/5 hover:border-white/10 transition-colors cursor-pointer">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">{ticket.subject}</p>
-                      <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">{ticket.createdAt}</p>
-                    </div>
-                    <span className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border shrink-0", s.color)}>
-                      <StatusIcon size={11} /> {s.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

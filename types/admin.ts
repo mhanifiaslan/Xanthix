@@ -1,55 +1,62 @@
-export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  plan: 'Deneme' | 'Standart' | 'Pro' | 'Kurumsal';
-  credits: number;
-  totalSpent: number;
-  projectCount: number;
-  joinedAt: string;
-  lastLogin: string;
-  status: 'aktif' | 'pasif' | 'banlı';
-  avatarUrl: string;
-}
+import { z } from 'zod';
 
-export interface Payment {
-  id: string;
-  userId: string;
-  userName: string;
-  amount: number;
-  credits: number;
-  package: string;
-  method: string;
-  status: 'basarili' | 'basarisiz' | 'iade';
-  date: string;
-  reference: string;
-}
+export const adminUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  plan: z.enum(['Deneme', 'Standart', 'Pro', 'Kurumsal']),
+  credits: z.number().int().nonnegative(),
+  totalSpent: z.number().nonnegative(),
+  projectCount: z.number().int().nonnegative(),
+  joinedAt: z.string(),
+  lastLogin: z.string(),
+  status: z.enum(['aktif', 'pasif', 'banlı']),
+  avatarUrl: z.string().url().optional().or(z.literal('')),
+});
+export type AdminUser = z.infer<typeof adminUserSchema>;
 
-export interface AdminMetrics {
-  todayActiveUsers: number;
-  yesterdayRevenue: number;
-  yesterdayAiCost: number;
-  marginRate: number;
-  totalUsers: number;
-  totalRevenue: number;
-}
+export const adminPaymentSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  amount: z.number().nonnegative(),
+  credits: z.number().int().nonnegative(),
+  package: z.string(),
+  method: z.string(),
+  status: z.enum(['basarili', 'basarisiz', 'iade']),
+  date: z.string(),
+  reference: z.string(),
+});
+export type Payment = z.infer<typeof adminPaymentSchema>;
 
-export interface SupportTicket {
-  id: string;
-  userId: string;
-  userName: string;
-  subject: string;
-  status: 'beklemede' | 'yanitlandi' | 'cozuldu';
-  priority: 'dusuk' | 'orta' | 'yuksek';
-  createdAt: string;
-}
+export const adminMetricsSchema = z.object({
+  todayActiveUsers: z.number().int().nonnegative(),
+  yesterdayRevenue: z.number().nonnegative(),
+  yesterdayAiCost: z.number().nonnegative(),
+  marginRate: z.number(),
+  totalUsers: z.number().int().nonnegative(),
+  totalRevenue: z.number().nonnegative(),
+});
+export type AdminMetrics = z.infer<typeof adminMetricsSchema>;
 
-export interface PricingPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price: number;
-  bonus: number;
-  isPopular: boolean;
-  isActive: boolean;
-}
+export const supportTicketSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  userName: z.string(),
+  subject: z.string(),
+  status: z.enum(['beklemede', 'yanitlandi', 'cozuldu']),
+  priority: z.enum(['dusuk', 'orta', 'yuksek']),
+  createdAt: z.string(),
+});
+export type SupportTicket = z.infer<typeof supportTicketSchema>;
+
+export const pricingPackageSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  credits: z.number().int().nonnegative(),
+  price: z.number().nonnegative(),
+  bonus: z.number().int().nonnegative(),
+  isPopular: z.boolean(),
+  isActive: z.boolean(),
+});
+export type PricingPackage = z.infer<typeof pricingPackageSchema>;

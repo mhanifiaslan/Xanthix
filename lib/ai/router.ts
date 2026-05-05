@@ -109,12 +109,37 @@ export interface RunPromptResult {
 
 export async function runPrompt(input: RunPromptInput): Promise<RunPromptResult> {
   const t0 = Date.now();
-  if (input.model.provider === 'vertex') {
-    return runVertex(input, t0);
+  try {
+    if (input.model.provider === 'vertex') {
+      return await runVertex(input, t0);
+    }
+    return await runAnthropicStub(input, t0);
+  } catch (err) {
+    console.error(`[router] Primary provider ${input.model.provider} failed, falling back...`, err);
+    
+    // Fallback chain: non-vertex → vertex pro
+    const fallbackModel = input.model.provider === 'vertex' ? MODELS.sonnet : MODELS.pro;
+    console.log(`[router] Attempting fallback to ${fallbackModel.tag} (${fallbackModel.provider})`);
+    
+    try {
+      if (fallbackModel.provider === 'vertex') {
+        return await runVertex({ ...input, model: fallbackModel }, t0);
+      }
+      return await runAnthropicStub({ ...input, model: fallbackModel }, t0);
+    } catch (fallbackErr) {
+      console.error(`[router] Fallback provider ${fallbackModel.provider} also failed.`, fallbackErr);
+      throw new Error(`Tüm yapay zeka sağlayıcıları yanıt vermiyor. Lütfen daha sonra tekrar deneyin.`);
+    }
   }
-  // Anthropic path is intentionally minimal until Sprint 3.1.
+}
+
+/**
+ * Anthropic provider stub — not yet wired (no ANTHROPIC_API_KEY).
+ * Throws a clear error so the fallback chain or the caller handles it gracefully.
+ */
+async function runAnthropicStub(input: RunPromptInput, _t0: number): Promise<RunPromptResult> {
   throw new Error(
-    `Provider "${input.model.provider}" not yet wired. Set ANTHROPIC_API_KEY and rebuild to enable.`,
+    `Provider "${input.model.provider}" is not yet enabled. Configure ANTHROPIC_API_KEY to activate.`,
   );
 }
 
@@ -195,3 +220,4 @@ export function paiTokensFor(opts: {
   const withMarkup = usd * 1.3;
   return Math.max(1, Math.ceil(withMarkup * 1000));
 }
+

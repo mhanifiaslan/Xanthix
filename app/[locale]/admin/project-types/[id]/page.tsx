@@ -3,7 +3,7 @@ import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { getProjectTypeById } from '@/lib/server/projectTypes';
 import { routing } from '@/i18n/routing';
-import EditForm from '../EditForm';
+import WizardEditForm from '../WizardEditForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,5 +19,5 @@ export default async function AdminProjectTypeEditPage({
   const type = await getProjectTypeById(id);
   if (!type) notFound();
 
-  return <EditForm initial={type} mode="edit" locale={locale} />;
+  return <WizardEditForm initial={type} mode="edit" locale={locale} />;
 }

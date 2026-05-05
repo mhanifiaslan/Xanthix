@@ -1,15 +1,18 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { pricingPackages } from "@/lib/mock-admin";
-import { PricingPackage } from "@/types/admin";
-import { Plus, Edit2, Star, Zap, ToggleLeft, ToggleRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { PricingPackage } from '@/types/admin';
+import { Plus, Edit2, Star, Zap, ToggleLeft, ToggleRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// TODO: Load from Firestore `pricingConfig` collection via server action.
+const DEFAULT_PACKAGES: PricingPackage[] = [];
 
 export default function AdminPricingPage() {
-  const [packages, setPackages] = useState<PricingPackage[]>(pricingPackages);
+  const [packages, setPackages] = useState<PricingPackage[]>(DEFAULT_PACKAGES);
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<PricingPackage>>({});
+
 
   const toggleActive = (id: string) => {
     setPackages((prev) => prev.map((p) => p.id === id ? { ...p, isActive: !p.isActive } : p));

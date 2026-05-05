@@ -1,51 +1,67 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { mockUsers } from "@/lib/mock-admin";
-import { Search, UserPlus, MoreVertical, CreditCard } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { useState, useEffect } from 'react';
+import { Search, UserPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
-const planColors: Record<string, string> = {
-  Deneme: "text-[var(--color-text-secondary)] bg-white/5 border-white/10",
-  Standart: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  Pro: "text-[var(--color-accent)] bg-[var(--color-accent)]/10 border-[var(--color-accent)]/20",
-  Kurumsal: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-};
+interface AdminUserView {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string | null;
+  disabled: boolean;
+  tokenBalance: number;
+  projectCount: number;
+  createdAt: string | null;
+  lastSignInAt: string | null;
+}
 
-const statusColors: Record<string, string> = {
-  aktif: "text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20",
-  pasif: "text-[var(--color-text-secondary)] bg-white/5 border-white/10",
-  "banlı": "text-[var(--color-error)] bg-[var(--color-error)]/10 border-[var(--color-error)]/20",
-};
+async function fetchUsers(): Promise<AdminUserView[]> {
+  const res = await fetch('/api/admin/users');
+  if (!res.ok) throw new Error('Failed to fetch users');
+  return res.json();
+}
 
 export default function AdminUsersPage() {
-  const [search, setSearch] = useState("");
-  const [planFilter, setPlanFilter] = useState("Tumu");
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Tümü');
+  const [users, setUsers] = useState<AdminUserView[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const plans = ["Tumu", "Deneme", "Standart", "Pro", "Kurumsal"];
+  useEffect(() => {
+    fetchUsers()
+      .then(setUsers)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const filtered = mockUsers.filter((u) => {
+  const statusOptions = ['Tümü', 'Aktif', 'Pasif'];
+
+  const filtered = users.filter((u) => {
     const matchSearch =
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.displayName.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase());
-    const matchPlan = planFilter === "Tumu" || u.plan === planFilter;
-    return matchSearch && matchPlan;
+    const matchStatus =
+      statusFilter === 'Tümü' ||
+      (statusFilter === 'Aktif' && !u.disabled) ||
+      (statusFilter === 'Pasif' && u.disabled);
+    return matchSearch && matchStatus;
   });
 
   return (
     <div className="min-h-full pb-12">
       <header className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text-primary)]">Kullanicilar</h1>
+          <h1 className="text-xl font-bold text-[var(--color-text-primary)]">Kullanıcılar</h1>
           <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
-            Toplam {mockUsers.length} kullanici kayitli
+            {loading ? 'Yükleniyor…' : `Toplam ${users.length} kullanıcı`}
           </p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors">
           <UserPlus size={15} />
-          Kullanici Ekle
+          Kullanıcı Ekle
         </button>
       </header>
 
@@ -64,15 +80,15 @@ export default function AdminUsersPage() {
             />
           </div>
           <div className="flex gap-2">
-            {plans.map((p) => (
+            {statusOptions.map((p) => (
               <button
                 key={p}
-                onClick={() => setPlanFilter(p)}
+                onClick={() => setStatusFilter(p)}
                 className={cn(
-                  "px-3 py-2 rounded-lg text-xs font-medium border transition-colors",
-                  planFilter === p
-                    ? "bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 text-[var(--color-accent)]"
-                    : "bg-[var(--color-card)] border-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/10"
+                  'px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
+                  statusFilter === p
+                    ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 text-[var(--color-accent)]'
+                    : 'bg-[var(--color-card)] border-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/10'
                 )}
               >
                 {p}
@@ -86,7 +102,7 @@ export default function AdminUsersPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/5 bg-[var(--color-sidebar)]/50">
-                {["Kullanici", "Plan", "Kredi", "Proje", "Toplam Harcama", "Son Giris", "Durum", ""].map((h) => (
+                {['Kullanıcı', 'Token Bakiyesi', 'Proje', 'Son Giriş', 'Durum'].map((h) => (
                   <th key={h} className="px-5 py-3.5 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -94,70 +110,73 @@ export default function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filtered.map((user) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-16 text-center text-sm text-[var(--color-text-secondary)]">
+                    Yükleniyor…
+                  </td>
+                </tr>
+              ) : filtered.map((user) => (
                 <tr
-                  key={user.id}
-                  onClick={() => router.push(`/admin/users/${user.id}`)}
+                  key={user.uid}
+                  onClick={() => router.push(`admin/users/${user.uid}`)}
                   className="hover:bg-white/[0.025] transition-colors cursor-pointer"
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <img src={user.avatarUrl} alt={user.name} className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center text-xs font-bold text-[var(--color-accent)] shrink-0">
+                          {user.displayName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
-                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{user.name}</p>
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{user.displayName}</p>
                         <p className="text-xs text-[var(--color-text-secondary)]">{user.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4">
-                    <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full border", planColors[user.plan])}>
-                      {user.plan}
-                    </span>
-                  </td>
                   <td className="px-5 py-4 text-sm tabular-nums text-[var(--color-text-primary)]">
-                    {user.credits.toLocaleString("tr-TR")}
+                    {user.tokenBalance.toLocaleString('tr-TR')}
                   </td>
                   <td className="px-5 py-4 text-sm tabular-nums text-[var(--color-text-primary)]">
                     {user.projectCount}
                   </td>
-                  <td className="px-5 py-4 text-sm tabular-nums text-[var(--color-text-primary)]">
-                    {user.totalSpent.toLocaleString("tr-TR")} TL
-                  </td>
                   <td className="px-5 py-4 text-xs text-[var(--color-text-secondary)]">
-                    {user.lastLogin}
+                    {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString('tr-TR') : '—'}
                   </td>
                   <td className="px-5 py-4">
-                    <span className={cn("text-xs font-medium px-2.5 py-1 rounded-full border", statusColors[user.status])}>
-                      {user.status}
+                    <span className={cn(
+                      'text-xs font-medium px-2.5 py-1 rounded-full border',
+                      user.disabled
+                        ? 'text-[var(--color-error)] bg-[var(--color-error)]/10 border-[var(--color-error)]/20'
+                        : 'text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20'
+                    )}>
+                      {user.disabled ? 'Pasif' : 'Aktif'}
                     </span>
-                  </td>
-                  <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                    <button className="p-1.5 rounded-lg text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors">
-                      <MoreVertical size={15} />
-                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {filtered.length === 0 && (
+          {!loading && filtered.length === 0 && (
             <div className="py-16 text-center text-sm text-[var(--color-text-secondary)]">
-              Sonuc bulunamadi.
+              Sonuç bulunamadı.
             </div>
           )}
         </div>
 
-        {/* Ozet satiri */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Özet */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {[
-            { label: "Aktif", value: mockUsers.filter(u => u.status === "aktif").length, color: "text-[var(--color-success)]" },
-            { label: "Pasif", value: mockUsers.filter(u => u.status === "pasif").length, color: "text-[var(--color-text-secondary)]" },
-            { label: "Banli", value: mockUsers.filter(u => u.status === "banlı").length, color: "text-[var(--color-error)]" },
-            { label: "Pro/Kurumsal", value: mockUsers.filter(u => u.plan === "Pro" || u.plan === "Kurumsal").length, color: "text-[var(--color-accent)]" },
+            { label: 'Aktif', value: users.filter((u) => !u.disabled).length, color: 'text-[var(--color-success)]' },
+            { label: 'Pasif', value: users.filter((u) => u.disabled).length, color: 'text-[var(--color-error)]' },
+            { label: 'Toplam', value: users.length, color: 'text-[var(--color-accent)]' },
           ].map((s) => (
             <div key={s.label} className="bg-[var(--color-card)] rounded-xl border border-white/5 p-4 text-center">
-              <p className={cn("text-2xl font-bold tabular-nums", s.color)}>{s.value}</p>
+              <p className={cn('text-2xl font-bold tabular-nums', s.color)}>{s.value}</p>
               <p className="text-xs text-[var(--color-text-secondary)] mt-1">{s.label}</p>
             </div>
           ))}
