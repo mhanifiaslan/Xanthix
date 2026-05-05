@@ -66,7 +66,16 @@ const nextConfig: NextConfig = {
   // keeps local and prod build behaviour identical so deploy-only bugs
   // (missing dynamic-loaded files, etc.) surface during local builds.
   output: 'standalone',
-  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'iyzipay'],
+  // @napi-rs/canvas ships native .node binaries that bundlers can't follow.
+  // pdfjs-dist (used by pdf-parse) explicitly tries to load it at runtime to
+  // get DOMMatrix; without it, parsing any PDF on Cloud Run throws
+  // "ReferenceError: DOMMatrix is not defined" before getText() ever runs.
+  serverExternalPackages: [
+    'pdf-parse',
+    'pdfjs-dist',
+    '@napi-rs/canvas',
+    'iyzipay',
+  ],
   // iyzipay does fs.readdirSync('./lib/resources') at runtime to discover
   // its API request shapes, then pulls in postman-request which has 70+
   // transitive deps. Next.js's standalone output only copies files
@@ -79,7 +88,17 @@ const nextConfig: NextConfig = {
   // The trailing /* in the route key is required — bare /** does not
   // match every route in Next.js's minimatch matcher.
   outputFileTracingIncludes: {
-    '/**/*': transitiveDepGlobs('iyzipay'),
+    // iyzipay: transitive jungle (postman-request etc.) — auto-discover
+    // walks the dep tree at config-load time.
+    // @napi-rs/canvas: native bindings — install resolves the right
+    //   platform binary as an optional sibling package
+    //   (@napi-rs/canvas-linux-x64-gnu on Cloud Run). Pull every
+    //   sibling so any platform that ends up being built ships.
+    '/**/*': [
+      ...transitiveDepGlobs('iyzipay'),
+      './node_modules/@napi-rs/canvas/**/*',
+      './node_modules/@napi-rs/canvas-*/**/*',
+    ],
   },
   experimental: {
     // Default Server Action body cap is 1 MB; PDF guide uploads can be up
