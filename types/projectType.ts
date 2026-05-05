@@ -79,7 +79,14 @@ const rubricDimensionSchema = z.object({
 });
 
 const rubricSchema = z.object({
-  dimensions: z.array(rubricDimensionSchema).min(1).max(8),
+  // .min(0): the form's RubricEditor mounts useFieldArray on
+  // `rubric.dimensions` for every section, which materialises an empty
+  // dimensions[] shell even when the admin never clicked "Rubric ekle".
+  // Rejecting that with .min(1) made every AI-drafted template fail Save.
+  // We tolerate the empty case at validation time and treat
+  // dimensions.length === 0 as "no rubric" everywhere downstream
+  // (judgeSection bails, ScorecardPanel hides, etc.).
+  dimensions: z.array(rubricDimensionSchema).max(8),
   // Pass threshold as a fraction of total possible (e.g. 0.7 = 70%).
   passingThreshold: z.number().min(0).max(1).default(0.7),
   // How many revise attempts the auto-loop is allowed when the score is

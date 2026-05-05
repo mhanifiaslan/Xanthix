@@ -254,7 +254,7 @@ export async function generateNextSectionAction(
     let judgeCostTotal = 0;
     let attemptsRun = 1;
 
-    if (section.rubric) {
+    if (section.rubric && section.rubric.dimensions.length > 0) {
       const rubric = section.rubric;
       const judgeContext = {
         projectTypeName: type.name.en,
