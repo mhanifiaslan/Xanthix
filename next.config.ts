@@ -89,15 +89,23 @@ const nextConfig: NextConfig = {
   // match every route in Next.js's minimatch matcher.
   outputFileTracingIncludes: {
     // iyzipay: transitive jungle (postman-request etc.) — auto-discover
-    // walks the dep tree at config-load time.
+    //   walks the dep tree at config-load time.
     // @napi-rs/canvas: native bindings — install resolves the right
     //   platform binary as an optional sibling package
     //   (@napi-rs/canvas-linux-x64-gnu on Cloud Run). Pull every
     //   sibling so any platform that ends up being built ships.
+    // pdf-parse + pdfjs-dist: pdfjs lazy-imports its worker
+    //   (pdf.worker.mjs) at first parse, which Next.js's static tracer
+    //   can't follow. Without these globs prod throws "Setting up fake
+    //   worker failed: Cannot find module '.../pdf.worker.mjs'".
     '/**/*': [
       ...transitiveDepGlobs('iyzipay'),
       './node_modules/@napi-rs/canvas/**/*',
       './node_modules/@napi-rs/canvas-*/**/*',
+      './node_modules/pdf-parse/**/*',
+      './node_modules/pdfjs-dist/legacy/build/**/*',
+      './node_modules/pdfjs-dist/build/**/*',
+      './node_modules/pdfjs-dist/package.json',
     ],
   },
   experimental: {
