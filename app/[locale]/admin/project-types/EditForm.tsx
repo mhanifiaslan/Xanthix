@@ -79,9 +79,21 @@ export default function EditForm({ initial, mode, locale }: Props) {
       try {
         // Re-number orders to match array position so display stays sane
         // even if the admin reordered cards.
+        // Also drop empty rubrics: react-hook-form's useFieldArray paths
+        // create `rubric: { dimensions: [] }` shells when RubricEditor
+        // mounts on a section that has no rubric. Schema requires
+        // dimensions.min(1), so unless the admin actually added a
+        // dimension we treat the rubric as absent.
         const normalized: FormValues = {
           ...values,
-          sections: values.sections.map((s, i) => ({ ...s, order: i })),
+          sections: values.sections.map((s, i) => {
+            const r = s.rubric;
+            const cleanedRubric =
+              r && Array.isArray(r.dimensions) && r.dimensions.length > 0
+                ? r
+                : null;
+            return { ...s, order: i, rubric: cleanedRubric };
+          }),
         };
         const { id } = await upsertProjectTypeAction(normalized);
         router.replace(`/${locale}/admin/project-types/${id}`);

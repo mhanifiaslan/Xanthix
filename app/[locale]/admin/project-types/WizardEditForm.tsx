@@ -83,9 +83,17 @@ export default function WizardEditForm({ initial, mode, locale }: Props) {
     setError(null);
     startTransition(async () => {
       try {
+        // Drop empty rubrics — see EditForm.onSubmit for rationale.
         const normalized: FormValues = {
           ...values,
-          sections: values.sections.map((s, i) => ({ ...s, order: i })),
+          sections: values.sections.map((s, i) => {
+            const r = s.rubric;
+            const cleanedRubric =
+              r && Array.isArray(r.dimensions) && r.dimensions.length > 0
+                ? r
+                : null;
+            return { ...s, order: i, rubric: cleanedRubric };
+          }),
         };
         const { id } = await upsertProjectTypeAction(normalized);
         router.replace(`/${locale}/admin/project-types/${id}`);
