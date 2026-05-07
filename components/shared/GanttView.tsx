@@ -1,18 +1,24 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { parseGantt, type GanttTask } from '@/lib/gantt/parse';
 
 interface Props {
   content: string;
+  /**
+   * Active locale, used to format dates and labels. The default is `en` for
+   * any callsite that hasn't yet wired the active locale through; production
+   * callers always pass the active `useLocale()` value.
+   */
   locale?: string;
 }
 
-export default function GanttView({ content, locale = 'tr' }: Props) {
+export default function GanttView({ content, locale = 'en' }: Props) {
   const parsed = useMemo(() => parseGantt(content), [content]);
+  const t = useTranslations('gantt');
 
   if (!parsed) {
-    // Fall back to monospace JSON so the user at least sees what AI returned.
     return (
       <pre className="text-xs leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap font-mono bg-[var(--color-background)] border border-white/5 rounded-xl p-3 overflow-x-auto">
         {content}
@@ -38,7 +44,7 @@ export default function GanttView({ content, locale = 'tr' }: Props) {
         <p className="text-xs text-[var(--color-text-secondary)]">
           {dateFormatter.format(rangeStart)} → {dateFormatter.format(rangeEnd)}
           {' · '}
-          {tasks.length} görev
+          {t('taskCount', { count: tasks.length })}
         </p>
       )}
 
@@ -50,33 +56,34 @@ export default function GanttView({ content, locale = 'tr' }: Props) {
                 ID
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)]">
-                Görev
+                {t('task')}
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)] w-28">
-                Başlangıç
+                {t('start')}
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)] w-28">
-                Bitiş
+                {t('end')}
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)] w-16">
-                Süre
+                {t('duration')}
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)] w-28">
-                Bağımlı
+                {t('dependencies')}
               </th>
               <th className="px-3 py-2 text-left font-semibold uppercase tracking-wider text-[10px] text-[var(--color-text-secondary)] min-w-[280px]">
-                Zaman çizgisi
+                {t('timeline')}
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {tasks.map((t) => (
+            {tasks.map((task) => (
               <TaskRow
-                key={t.id}
-                task={t}
+                key={task.id}
+                task={task}
                 rangeStart={rangeStart}
                 totalMs={totalMs}
                 dateFormatter={dateFormatter}
+                noDateLabel={t('noDate')}
               />
             ))}
           </tbody>
@@ -91,11 +98,13 @@ function TaskRow({
   rangeStart,
   totalMs,
   dateFormatter,
+  noDateLabel,
 }: {
   task: GanttTask;
   rangeStart: Date | null;
   totalMs: number;
   dateFormatter: Intl.DateTimeFormat;
+  noDateLabel: string;
 }) {
   let leftPct = 0;
   let widthPct = 0;
@@ -103,7 +112,7 @@ function TaskRow({
     leftPct = ((task.start.getTime() - rangeStart.getTime()) / totalMs) * 100;
     widthPct =
       ((task.end.getTime() - task.start.getTime()) / totalMs) * 100;
-    if (widthPct < 1.5) widthPct = 1.5; // tiny tasks still visible
+    if (widthPct < 1.5) widthPct = 1.5;
   }
 
   return (
@@ -142,7 +151,7 @@ function TaskRow({
             />
           ) : (
             <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--color-text-secondary)]">
-              tarih yok
+              {noDateLabel}
             </span>
           )}
         </div>

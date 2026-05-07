@@ -290,9 +290,9 @@ export async function queueInvitationEmail(opts: {
   }
 }
 
-function formatExpiry(value: Date | string): string {
+function formatExpiry(value: Date | string, locale: string = 'en'): string {
   const d = typeof value === 'string' ? new Date(value) : value;
-  return d.toLocaleString('tr-TR', {
+  return d.toLocaleString(locale, {
     year: 'numeric',
     month: 'long',
     day: '2-digit',

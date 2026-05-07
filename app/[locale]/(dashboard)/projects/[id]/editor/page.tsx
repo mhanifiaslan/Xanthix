@@ -2,18 +2,17 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
 
 /**
- * Legacy editor route — now redirects to the unified ProjectView
- * which includes inline TipTap editing.
- *
- * @module editor/page
- * @see SKILLS.md Faz 6 - Workspace ve Belge Üretimi
+ * Legacy editor route — redirects to the unified ProjectView which now
+ * includes inline TipTap editing.
  */
 export default function ProjectEditorPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('redirect');
   const projectId = params.id as string;
 
   useEffect(() => {
@@ -26,7 +25,7 @@ export default function ProjectEditorPage() {
     <div className="flex items-center justify-center h-screen bg-[var(--color-background)]">
       <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
         <Loader2 size={18} className="animate-spin" />
-        <span className="text-sm">Proje görünümüne yönlendiriliyor…</span>
+        <span className="text-sm">{t('loading')}</span>
       </div>
     </div>
   );

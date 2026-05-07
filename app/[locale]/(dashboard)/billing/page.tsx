@@ -60,14 +60,10 @@ export default async function BillingPage({
       locale={locale}
       walletKind={walletKind}
       orgName={orgName}
+      orgTier={org?.subscriptionTier ?? null}
       canPurchase={canPurchase && paymentsEnabled}
       paymentsEnabled={paymentsEnabled}
       balance={balance}
-      planLabel={
-        walletKind === 'org'
-          ? `Kurum cüzdanı · ${org?.subscriptionTier ?? 'trial'}`
-          : 'Bireysel cüzdan'
-      }
       packages={packages.map((p) => ({
         id: p.id,
         slug: p.slug,

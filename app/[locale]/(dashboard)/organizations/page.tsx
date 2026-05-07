@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Building2, Plus, Users, Wallet } from 'lucide-react';
 import { hasLocale } from 'next-intl';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { listOrgsForUser } from '@/lib/server/organizations';
 import { routing } from '@/i18n/routing';
@@ -22,6 +22,8 @@ export default async function OrganizationsListPage({
   if (!session) redirect(`/${locale}/login`);
 
   const orgs = await listOrgsForUser(session.uid);
+  const t = await getTranslations({ locale, namespace: 'organizations' });
+  const tWallet = await getTranslations({ locale, namespace: 'wallet' });
 
   return (
     <div className="min-h-full pb-12">
@@ -32,10 +34,10 @@ export default async function OrganizationsListPage({
           </div>
           <div>
             <h1 className="text-xl font-bold text-[var(--color-text-primary)]">
-              Kurumlarım
+              {t('title')}
             </h1>
             <p className="text-xs text-[var(--color-text-secondary)]">
-              {orgs.length} kurum
+              {t('countSuffix', { count: orgs.length })}
             </p>
           </div>
         </div>
@@ -43,7 +45,7 @@ export default async function OrganizationsListPage({
           href={`/${locale}/organizations/new`}
           className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors"
         >
-          <Plus size={15} /> Yeni kurum
+          <Plus size={15} /> {t('newButton')}
         </Link>
       </header>
 
@@ -55,17 +57,16 @@ export default async function OrganizationsListPage({
               className="mx-auto mb-4 text-[var(--color-text-secondary)]"
             />
             <p className="text-sm text-[var(--color-text-primary)] font-medium mb-1">
-              Henüz bir kuruma üye değilsin
+              {t('emptyTitle')}
             </p>
             <p className="text-sm text-[var(--color-text-secondary)] mb-5">
-              Kurum açtığında ekip üyelerini davet edip ortak proje yazabilirsin.
-              Kuruma özel proje türleri sadece kurum üyelerine görünür.
+              {t('emptyBody')}
             </p>
             <Link
               href={`/${locale}/organizations/new`}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors"
             >
-              <Plus size={15} /> Kurum oluştur
+              <Plus size={15} /> {t('createButton')}
             </Link>
           </div>
         ) : (
@@ -88,7 +89,7 @@ export default async function OrganizationsListPage({
                         <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
                           {o.country ?? '—'} ·{' '}
                           {o.subscriptionTier.toUpperCase()} ·{' '}
-                          {o.seatLimit} koltuk
+                          {t('seatLimitSuffix', { count: o.seatLimit })}
                         </p>
                       </div>
                     </div>
@@ -96,11 +97,11 @@ export default async function OrganizationsListPage({
                   <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
                     <span className="flex items-center gap-1.5">
                       <Wallet size={12} className="text-[var(--color-accent)]" />
-                      {o.tokenBalance.toLocaleString(locale)} token
+                      {o.tokenBalance.toLocaleString(locale)} {tWallet('tokenSuffix')}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Users size={12} />
-                      üye listesi →
+                      {t('memberListLink')}
                     </span>
                   </div>
                 </Link>

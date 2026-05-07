@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireServerSession } from '@/lib/server/getServerSession';
 import {
@@ -48,19 +49,27 @@ async function assertOwner(orgId: string, uid: string): Promise<void> {
 
 // ----- Create ---------------------------------------------------------------
 
-const createSchema = z.object({
-  name: z.string().min(2, 'En az 2 karakter olmalı.').max(120),
-  country: z.string().min(2).max(8).optional().or(z.literal('')),
-  vatNumber: z.string().max(40).optional().or(z.literal('')),
-  billingEmail: z.string().email('Geçerli bir e-posta gir.').optional().or(z.literal('')),
-});
-
-export type CreateOrgInput = z.input<typeof createSchema>;
+export interface CreateOrgInput {
+  name: string;
+  country?: string;
+  vatNumber?: string;
+  billingEmail?: string;
+}
 
 export async function createOrgAction(
   raw: CreateOrgInput,
 ): Promise<{ id: string }> {
   const session = await requireServerSession();
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
+  const createSchema = z.object({
+    name: z.string().min(2, t('org.nameTooShort')).max(120),
+    country: z.string().min(2).max(8).optional().or(z.literal('')),
+    vatNumber: z.string().max(40).optional().or(z.literal('')),
+    billingEmail: z.string().email(t('org.invalidEmail')).optional().or(z.literal('')),
+  });
+
   const input = createSchema.parse(raw);
 
   // Pull the current display name from Auth so the seeded owner-member doc
@@ -112,13 +121,11 @@ export async function updateOrgAction(
 
 // ----- Invite ---------------------------------------------------------------
 
-const inviteSchema = z.object({
-  orgId: z.string().min(1),
-  email: z.string().email('Geçerli bir e-posta gir.'),
-  role: z.enum(ORG_ROLES).default('editor'),
-});
-
-export type InviteMemberInput = z.input<typeof inviteSchema>;
+export interface InviteMemberInput {
+  orgId: string;
+  email: string;
+  role?: OrgRole;
+}
 
 export interface InviteResult {
   kind: 'added' | 'invited';
@@ -131,15 +138,20 @@ export async function inviteOrgMemberAction(
   raw: InviteMemberInput,
 ): Promise<InviteResult> {
   const session = await requireServerSession();
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
+  const inviteSchema = z.object({
+    orgId: z.string().min(1),
+    email: z.string().email(t('org.invalidEmail')),
+    role: z.enum(ORG_ROLES).default('editor'),
+  });
+
   const input = inviteSchema.parse(raw);
   await assertManager(input.orgId, session.uid);
 
-  // 'owner' is reserved — only one owner at a time, transferred via a
-  // dedicated action.
   if (input.role === 'owner') {
-    throw new Error(
-      'Sahiplik doğrudan davetle verilemez. Önce kullanıcıyı admin olarak ekle, sonra sahipliği devret.',
-    );
+    throw new Error(t('org.cannotInviteOwner'));
   }
 
   const auth = getAdminAuth();
@@ -161,9 +173,7 @@ export async function inviteOrgMemberAction(
       return { kind: 'added', uid: userRecord.uid };
     } catch (err) {
       if (err instanceof SeatLimitReachedError) {
-        throw new Error(
-          `Koltuk limiti dolu (${err.limit}). Önce limiti yükselt veya bir üyeyi çıkar.`,
-        );
+        throw new Error(t('org.seatLimitFull', { limit: err.limit }));
       }
       throw err;
     }
@@ -238,21 +248,22 @@ export async function acceptInvitationAction(
   const session = await requireServerSession();
   const input = acceptSchema.parse(raw);
 
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
   try {
     const result = await acceptInvitation(input.token, session.uid);
     revalidatePath('/[locale]/organizations', 'layout');
     return result;
   } catch (err) {
     if (err instanceof InvitationExpiredError) {
-      throw new Error('Davet süresi dolmuş. Yeniden davet istemen gerek.');
+      throw new Error(t('org.invitationExpired'));
     }
     if (err instanceof InvitationConsumedError) {
-      throw new Error('Bu davet artık kullanılamaz.');
+      throw new Error(t('org.invitationUnusable'));
     }
     if (err instanceof InvitationEmailMismatchError) {
-      throw new Error(
-        'Bu davet farklı bir e-postaya gönderilmiş. O e-posta ile giriş yapıp tekrar dene.',
-      );
+      throw new Error(t('org.invitationEmailMismatch'));
     }
     throw err;
   }
@@ -294,19 +305,16 @@ export async function changeMemberRoleAction(
   const input = changeRoleSchema.parse(raw);
   await assertManager(input.orgId, session.uid);
 
-  // Only the current owner can grant 'owner' (handled by transferOwnership).
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
   if (input.role === 'owner') {
-    throw new Error(
-      'Sahiplik devri ayrı bir işlemdir; bu uçtan değiştirilemez.',
-    );
+    throw new Error(t('org.cannotChangeToOwner'));
   }
 
-  // Prevent demoting the sole owner via this path.
   const existing = await getMemberDoc(input.orgId, input.uid);
   if (existing?.role === 'owner') {
-    throw new Error(
-      'Sahibin rolünü düşürebilmek için önce sahipliği başkasına devret.',
-    );
+    throw new Error(t('org.cannotDemoteOwner'));
   }
 
   await setMemberRole(input.orgId, input.uid, input.role);
@@ -327,21 +335,20 @@ export async function removeMemberAction(
   const session = await requireServerSession();
   const input = removeSchema.parse(raw);
 
-  const target = await getMemberDoc(input.orgId, input.uid);
-  if (!target) throw new Error('Üye bulunamadı.');
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
 
-  // Self-leave path: any member can leave themselves, except the owner who
-  // must transfer ownership first.
+  const target = await getMemberDoc(input.orgId, input.uid);
+  if (!target) throw new Error(t('org.memberNotFound'));
+
   if (input.uid === session.uid) {
     if (target.role === 'owner') {
-      throw new Error(
-        'Sahip olarak ayrılamazsın. Önce sahipliği başka bir admin\'e devret.',
-      );
+      throw new Error(t('org.cannotLeaveAsOwner'));
     }
   } else {
     await assertManager(input.orgId, session.uid);
     if (target.role === 'owner') {
-      throw new Error('Sahibi çıkaramazsın; önce sahipliği devret.');
+      throw new Error(t('org.cannotRemoveOwner'));
     }
   }
 
@@ -365,13 +372,16 @@ export async function transferOwnershipAction(
   const input = transferSchema.parse(raw);
   await assertOwner(input.orgId, session.uid);
 
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
   if (input.toUid === session.uid) {
-    throw new Error('Zaten sahiplik sende.');
+    throw new Error(t('org.alreadyOwner'));
   }
 
   const target = await getMemberDoc(input.orgId, input.toUid);
   if (!target) {
-    throw new Error('Sahipliği devredeceğin kişi önce kuruma üye olmalı.');
+    throw new Error(t('org.notMemberFirst'));
   }
 
   // Order matters: demote current owner to 'admin' first, then promote target

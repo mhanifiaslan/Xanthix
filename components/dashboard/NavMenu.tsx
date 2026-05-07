@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { usePathname } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Archive,
   ArrowRight,
@@ -13,13 +13,11 @@ import {
   FolderGit2,
   HelpCircle,
   Home,
-  LogOut,
   MessageSquare,
   Settings,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth/AuthProvider';
 import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 import type { ProjectType } from '@/types/projectType';
 
@@ -43,21 +41,22 @@ interface NavGroup {
 export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
   const pathname = usePathname();
   const locale = useLocale();
-  const { signOut } = useAuth();
-  const router = useRouter();
+  const tGroups = useTranslations('nav.groups');
+  const tItems = useTranslations('nav.items');
+  const tCommon = useTranslations('common');
 
   const localePath = (p: string) => `/${locale}${p === '/' ? '' : p}`;
 
   const groups: NavGroup[] = [
     {
-      label: 'Ana erişim',
+      label: tGroups('mainAccess'),
       items: [
-        { icon: Home, label: 'Ana sayfa', href: localePath('/') },
-        { icon: FolderGit2, label: 'Projelerim', href: localePath('/projects') },
+        { icon: Home, label: tItems('home'), href: localePath('/home') },
+        { icon: FolderGit2, label: tItems('projects'), href: localePath('/projects') },
       ],
     },
     {
-      label: 'Yeni proje başla',
+      label: tGroups('startNewProject'),
       items: featuredTypes.slice(0, 4).map((t) => ({
         icon: projectTypeIcon(t.iconName),
         label: t.name[locale as 'tr' | 'en' | 'es'] ?? t.name.en,
@@ -65,43 +64,38 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
       })),
     },
     {
-      label: 'Araçlar',
+      label: tGroups('tools'),
       items: [
-        { icon: BookOpen, label: 'Şablonlarım', href: '#', soon: true },
-        { icon: Archive, label: 'Arşiv', href: localePath('/archive') },
-        { icon: BarChart2, label: 'İstatistikler', href: '#', soon: true },
+        { icon: BookOpen, label: tItems('myTemplates'), href: '#', soon: true },
+        { icon: Archive, label: tItems('archive'), href: localePath('/archive') },
+        { icon: BarChart2, label: tItems('stats'), href: '#', soon: true },
       ],
     },
     {
-      label: 'Çalışma alanı',
+      label: tGroups('workspace'),
       items: [
-        { icon: Building2, label: 'Kurumlarım', href: localePath('/organizations') },
+        { icon: Building2, label: tItems('organizations'), href: localePath('/organizations') },
       ],
     },
     {
-      label: 'Hesap',
+      label: tGroups('account'),
       items: [
-        { icon: CreditCard, label: 'Kredi & fatura', href: localePath('/billing') },
-        { icon: Settings, label: 'Ayarlar', href: localePath('/settings') },
-        { icon: MessageSquare, label: 'Destek', href: localePath('/support') },
-        { icon: HelpCircle, label: 'Yardım', href: '#', soon: true },
+        { icon: CreditCard, label: tItems('creditsBilling'), href: localePath('/billing') },
+        { icon: Settings, label: tItems('settings'), href: localePath('/settings') },
+        { icon: MessageSquare, label: tItems('support'), href: localePath('/support') },
+        { icon: HelpCircle, label: tItems('help'), href: '#', soon: true },
       ],
     },
   ];
 
   if (isAdmin) {
     groups.push({
-      label: 'Yönetim',
+      label: tGroups('management'),
       items: [
-        { icon: ArrowRight, label: 'Admin paneli', href: localePath('/admin') },
+        { icon: ArrowRight, label: tItems('adminPanel'), href: localePath('/admin') },
       ],
     });
   }
-
-  const handleLogout = async () => {
-    await signOut();
-    router.push(localePath('/login'));
-  };
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-2 pb-4">
@@ -113,7 +107,7 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
           <nav className="space-y-0.5">
             {group.items.map((item) => {
               const isActive =
-                item.href === localePath('/')
+                item.href === localePath('/home')
                   ? pathname === item.href
                   : pathname?.startsWith(item.href) ?? false;
               return (
@@ -122,7 +116,7 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
                   href={item.soon ? '#' : item.href}
                   onClick={item.soon ? (e) => e.preventDefault() : undefined}
                   className={cn(
-                    'flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                     isActive
                       ? 'bg-[var(--color-card)] text-[var(--color-text-primary)]'
                       : item.soon
@@ -139,7 +133,7 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
                   </span>
                   {item.soon && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 uppercase tracking-wide">
-                      Yakında
+                      {tCommon('comingSoon')}
                     </span>
                   )}
                 </Link>
@@ -151,16 +145,6 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
           )}
         </div>
       ))}
-
-      <div className="mt-auto pt-4 border-t border-white/5">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-error)]/5 hover:text-[var(--color-error)] transition-colors"
-        >
-          <LogOut size={16} />
-          Çıkış yap
-        </button>
-      </div>
     </div>
   );
 }

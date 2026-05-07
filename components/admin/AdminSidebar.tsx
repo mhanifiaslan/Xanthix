@@ -1,79 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import {
   LayoutDashboard, Users, CreditCard, FolderGit2, DollarSign,
-  TicketIcon, Settings, LogOut, Bot, ShieldCheck
+  TicketIcon, Settings, Bot, ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/auth/AuthProvider";
+import UserMenuCell from "@/components/shared/sidebar/UserMenuCell";
 
-const groups: {
-  label: string;
-  items: { icon: React.ElementType; label: string; href: string; soon?: boolean }[];
-}[] = [
+interface AdminGroup {
+  labelKey: string;
+  items: { icon: React.ElementType; labelKey: string; href: string; soon?: boolean }[];
+}
+
+const groups: AdminGroup[] = [
   {
-    label: "Genel",
+    labelKey: "general",
     items: [
-      { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
-      { icon: Users,           label: "Kullanicilar", href: "/admin/users" },
-      { icon: CreditCard,      label: "Odemeler", href: "/admin/payments" },
+      { icon: LayoutDashboard, labelKey: "dashboard", href: "/admin" },
+      { icon: Users,           labelKey: "users", href: "/admin/users" },
+      { icon: CreditCard,      labelKey: "payments", href: "/admin/payments" },
     ],
   },
   {
-    label: "Icerik",
+    labelKey: "content",
     items: [
-      { icon: FolderGit2, label: "Proje Turleri", href: "/admin/project-types" },
-      { icon: DollarSign, label: "Fiyatlandirma", href: "/admin/pricing" },
+      { icon: FolderGit2, labelKey: "projectTypes", href: "/admin/project-types" },
+      { icon: DollarSign, labelKey: "pricing", href: "/admin/pricing" },
     ],
   },
   {
-    label: "Destek",
+    labelKey: "support",
     items: [
-      { icon: TicketIcon, label: "Talepler", href: "/admin/support", soon: true },
+      { icon: TicketIcon, labelKey: "supportTickets", href: "/admin/support", soon: true },
     ],
   },
   {
-    label: "Sistem",
+    labelKey: "system",
     items: [
-      { icon: Settings, label: "Ayarlar", href: "/admin/settings", soon: true },
+      { icon: Settings, labelKey: "settings", href: "/admin/settings", soon: true },
     ],
   },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const { signOut, user } = useAuth();
-  const router = useRouter();
+  const locale = useLocale();
+  const tBrand = useTranslations("admin.brand");
+  const tGroups = useTranslations("admin.nav.groups");
+  const tItems = useTranslations("admin.nav.items");
+  const tCommon = useTranslations("common");
+
+  const localizedHref = (href: string) => `/${locale}${href}`;
 
   return (
     <aside className="w-[260px] bg-[var(--color-sidebar)] h-full flex flex-col border-r border-white/5 shrink-0">
       {/* Brand */}
       <div className="px-5 py-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-md bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center">
             <Bot size={16} className="text-[var(--color-accent)]" />
           </div>
           <div>
-            <p className="text-sm font-bold text-[var(--color-text-primary)]">Projectmenager</p>
+            <p className="text-sm font-bold text-[var(--color-text-primary)]">{tBrand("name")}</p>
             <div className="flex items-center gap-1 text-[10px] text-[var(--color-accent)]">
               <ShieldCheck size={10} />
-              Admin Paneli
+              {tBrand("subtitle")}
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Admin user */}
-      <div className="px-3 py-3 border-b border-white/5">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="w-8 h-8 rounded-full bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center text-xs font-bold text-[var(--color-accent)]">
-            A
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-[var(--color-text-primary)]">{user?.name}</p>
-            <p className="text-[10px] text-[var(--color-text-secondary)]">{user?.email}</p>
           </div>
         </div>
       </div>
@@ -83,22 +78,23 @@ export default function AdminSidebar() {
         {groups.map((group, gi) => (
           <div key={gi} className={cn("mb-1", gi > 0 && "mt-4")}>
             <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/60">
-              {group.label}
+              {tGroups(group.labelKey)}
             </p>
             <nav className="space-y-0.5">
               {group.items.map((item) => {
+                const localized = localizedHref(item.href);
                 const isActive =
                   item.href === "/admin"
-                    ? pathname === "/admin"
-                    : pathname.startsWith(item.href);
+                    ? pathname === localized
+                    : pathname.startsWith(localized);
 
                 return (
                   <Link
                     key={item.href}
-                    href={item.soon ? "#" : item.href}
+                    href={item.soon ? "#" : localized}
                     onClick={item.soon ? (e) => e.preventDefault() : undefined}
                     className={cn(
-                      "flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      "flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                       isActive
                         ? "bg-[var(--color-card)] text-[var(--color-text-primary)]"
                         : item.soon
@@ -108,11 +104,11 @@ export default function AdminSidebar() {
                   >
                     <span className="flex items-center gap-3">
                       <item.icon size={16} className={isActive ? "text-[var(--color-accent)]" : ""} />
-                      {item.label}
+                      {tItems(item.labelKey)}
                     </span>
                     {item.soon && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 uppercase">
-                        Yakında
+                        {tCommon("comingSoon")}
                       </span>
                     )}
                   </Link>
@@ -122,17 +118,9 @@ export default function AdminSidebar() {
             {gi < groups.length - 1 && <div className="mt-3 border-t border-white/5" />}
           </div>
         ))}
-
-        <div className="mt-auto pt-4 border-t border-white/5">
-          <button
-            onClick={async () => { await signOut(); router.push("/login"); }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-error)]/5 hover:text-[var(--color-error)] transition-colors"
-          >
-            <LogOut size={16} />
-            Cikis Yap
-          </button>
-        </div>
       </div>
+
+      <UserMenuCell variant="admin" />
     </aside>
   );
 }

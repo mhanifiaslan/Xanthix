@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { requireServerSession } from '@/lib/server/getServerSession';
@@ -37,29 +38,26 @@ export interface CheckoutResult {
 export async function createTokenCheckoutAction(
   rawInput: unknown,
 ): Promise<CheckoutResult> {
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
   if (!isIyzicoConfigured()) {
-    // Surfaced as a toast on /billing — UI also disables the buttons in
-    // this state, so this is a defense-in-depth check for direct callers.
-    throw new Error(
-      'Ödeme altyapısı henüz aktif değil. Lütfen daha sonra tekrar deneyin.',
-    );
+    throw new Error(t('payment.notConfigured'));
   }
 
   const { packageId } = checkoutInputSchema.parse(rawInput);
   const session = await requireServerSession();
 
   const pkg = await getTokenPackage(packageId);
-  if (!pkg) throw new Error('Token paketi bulunamadı.');
-  if (!pkg.active) throw new Error('Bu paket artık satışta değil.');
+  if (!pkg) throw new Error(t('payment.packageNotFound'));
+  if (!pkg.active) throw new Error(t('payment.packageInactive'));
 
   const ws = await getActiveWorkspace(session.uid);
   let orgIdForPurchase: string | null = null;
   if (ws.kind === 'org') {
     const member = await getMemberDoc(ws.orgId, session.uid);
     if (!member || !ORG_MANAGER_ROLES.includes(member.role)) {
-      throw new Error(
-        'Bu kurum için satın alma yetkin yok — sadece sahip ve adminler kredi alabilir.',
-      );
+      throw new Error(t('payment.noPermission'));
     }
     orgIdForPurchase = ws.orgId;
   }

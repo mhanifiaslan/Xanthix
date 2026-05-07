@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { listProjectTypes } from '@/lib/server/projectTypes';
 import { listOrgsWithMembershipForUser } from '@/lib/server/organizations';
@@ -48,6 +49,12 @@ export default async function DashboardLayout({
     memberCount: undefined,
   }));
 
+  const tWallet = await getTranslations({ locale, namespace: 'wallet' });
+  const walletLabel =
+    workspace.kind === 'org'
+      ? tWallet('orgLabel', { name: workspace.orgName })
+      : tWallet('personalLabel');
+
   return (
     <DashboardLayoutClient
       sidebar={
@@ -60,10 +67,7 @@ export default async function DashboardLayout({
             kind: workspace.kind === 'org' ? 'org' : 'personal',
             orgId: workspace.kind === 'org' ? workspace.orgId : undefined,
             initialBalance: walletBalance,
-            label:
-              workspace.kind === 'org'
-                ? `${workspace.orgName} cüzdanı`
-                : 'Kişisel bakiye',
+            label: walletLabel,
           }}
           locale={locale}
         />

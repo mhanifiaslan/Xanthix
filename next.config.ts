@@ -58,6 +58,8 @@ const nextConfig: NextConfig = {
   // typedRoutes will be re-enabled once every internal link uses the
   // locale-aware navigation helpers from `@/i18n/navigation`.
   typedRoutes: false,
+  // Hide the floating dev pill ("Static / Turbopack / Rendering…"). Dev-only.
+  devIndicators: false,
   // pdf-parse → pdfjs-dist tries to load its worker via dynamic import;
   // iyzipay → does dynamic readdirSync + require() of its lib/resources.
   // Both confuse Webpack/Turbopack. Keeping them external makes Node use

@@ -3,8 +3,8 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
+import { useTranslations } from 'next-intl';
 import { Bold, Italic, List, ListOrdered, Heading2, Heading3, Quote, Code } from 'lucide-react';
-import { useEffect } from 'react';
 
 interface TipTapEditorProps {
   initialContent: string;
@@ -13,6 +13,7 @@ interface TipTapEditorProps {
 }
 
 export default function TipTapEditor({ initialContent, onChange, editable = true }: TipTapEditorProps) {
+  const t = useTranslations('editor');
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -21,9 +22,6 @@ export default function TipTapEditor({ initialContent, onChange, editable = true
     content: initialContent,
     editable,
     onUpdate: ({ editor }) => {
-      // Use the markdown extension to output standard markdown.
-      // tiptap-markdown registers `markdown` on editor.storage at runtime
-      // but doesn't extend the StorageMap type — cast to access it.
       const md = (editor.storage as unknown as {
         markdown: { getMarkdown: () => string };
       }).markdown;
@@ -35,11 +33,6 @@ export default function TipTapEditor({ initialContent, onChange, editable = true
       },
     },
   });
-
-  // Keep content synced if initialContent changes significantly from outside,
-  // but we usually don't want to overwrite local edits unless necessary.
-  // We'll skip deep syncing here to avoid cursor jumps during active typing,
-  // relying on the parent to unmount/remount or manage state if a hard reset is needed.
 
   if (!editor) {
     return null;
@@ -53,52 +46,52 @@ export default function TipTapEditor({ initialContent, onChange, editable = true
             onClick={() => editor.chain().focus().toggleBold().run()}
             isActive={editor.isActive('bold')}
             icon={<Bold size={14} />}
-            title="Kalın"
+            title={t('bold')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             isActive={editor.isActive('italic')}
             icon={<Italic size={14} />}
-            title="İtalik"
+            title={t('italic')}
           />
           <div className="w-px h-4 bg-white/10 mx-1" />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             isActive={editor.isActive('heading', { level: 2 })}
             icon={<Heading2 size={14} />}
-            title="Başlık 2"
+            title={t('heading2')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
             isActive={editor.isActive('heading', { level: 3 })}
             icon={<Heading3 size={14} />}
-            title="Başlık 3"
+            title={t('heading3')}
           />
           <div className="w-px h-4 bg-white/10 mx-1" />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             isActive={editor.isActive('bulletList')}
             icon={<List size={14} />}
-            title="Sırasız Liste"
+            title={t('bulletList')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
             isActive={editor.isActive('orderedList')}
             icon={<ListOrdered size={14} />}
-            title="Sıralı Liste"
+            title={t('orderedList')}
           />
           <div className="w-px h-4 bg-white/10 mx-1" />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
             isActive={editor.isActive('blockquote')}
             icon={<Quote size={14} />}
-            title="Alıntı"
+            title={t('blockquote')}
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
             isActive={editor.isActive('codeBlock')}
             icon={<Code size={14} />}
-            title="Kod Bloğu"
+            title={t('codeBlock')}
           />
         </div>
       )}

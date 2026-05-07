@@ -3,12 +3,14 @@
 import { type FormEvent, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Building2, Loader2 } from 'lucide-react';
 import { createOrgAction } from '@/lib/actions/organizations';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 export default function NewOrgForm({ locale }: { locale: string }) {
   const router = useRouter();
+  const t = useTranslations('organizations');
   const { refreshClaims } = useAuth();
   const [name, setName] = useState('');
   const [country, setCountry] = useState('TR');
@@ -21,7 +23,7 @@ export default function NewOrgForm({ locale }: { locale: string }) {
     e.preventDefault();
     setError(null);
     if (name.trim().length < 2) {
-      setError('Kurum adı en az 2 karakter olmalı.');
+      setError(t('errorNameTooShort'));
       return;
     }
     startTransition(async () => {
@@ -32,14 +34,11 @@ export default function NewOrgForm({ locale }: { locale: string }) {
           vatNumber: vatNumber.trim() || undefined,
           billingEmail: billingEmail.trim() || undefined,
         });
-        // syncOrgClaims has already updated the user's custom claims server-
-        // side; refreshClaims forces the ID token + session cookie to roll so
-        // org-only project types and the new orgIds appear immediately.
         await refreshClaims();
         router.replace(`/${locale}/organizations/${id}`);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Kurum oluşturulamadı.');
+        setError(err instanceof Error ? err.message : t('errorGeneric'));
       }
     });
   };
@@ -55,10 +54,10 @@ export default function NewOrgForm({ locale }: { locale: string }) {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-[var(--color-text-primary)]">
-            Yeni kurum
+            {t('newButton')}
           </h1>
           <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
-            Kurumun adını ve fatura bilgilerini gir.
+            {t('newPageSubtitle')}
           </p>
         </div>
       </header>
@@ -71,25 +70,24 @@ export default function NewOrgForm({ locale }: { locale: string }) {
             </div>
             <div>
               <p className="text-base font-semibold text-[var(--color-text-primary)]">
-                Kurum bilgileri
+                {t('formInfoTitle')}
               </p>
               <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                Kurum açıldıktan sonra ekip üyelerini davet edebilir, ortak token
-                havuzu üzerinden proje yazabilirsin.
+                {t('formInfoBody')}
               </p>
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-              Kurum adı *
+              {t('fieldName')}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Örn: Yenilik Atölyesi A.Ş."
+              placeholder={t('fieldNamePlaceholder')}
               className="w-full bg-[var(--color-background)] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
             />
           </div>
@@ -97,7 +95,7 @@ export default function NewOrgForm({ locale }: { locale: string }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-                Ülke kodu
+                {t('fieldCountry')}
               </label>
               <input
                 type="text"
@@ -110,13 +108,13 @@ export default function NewOrgForm({ locale }: { locale: string }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-                Vergi / VAT no
+                {t('fieldVat')}
               </label>
               <input
                 type="text"
                 value={vatNumber}
                 onChange={(e) => setVatNumber(e.target.value)}
-                placeholder="opsiyonel"
+                placeholder={t('fieldVatPlaceholder')}
                 className="w-full bg-[var(--color-background)] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
               />
             </div>
@@ -124,13 +122,13 @@ export default function NewOrgForm({ locale }: { locale: string }) {
 
           <div>
             <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-              Fatura e-postası
+              {t('fieldBillingEmail')}
             </label>
             <input
               type="email"
               value={billingEmail}
               onChange={(e) => setBillingEmail(e.target.value)}
-              placeholder="opsiyonel — boşsa kendi e-postan kullanılır"
+              placeholder={t('fieldBillingEmailPlaceholder')}
               className="w-full bg-[var(--color-background)] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all"
             />
           </div>
@@ -149,7 +147,7 @@ export default function NewOrgForm({ locale }: { locale: string }) {
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
           >
             {isPending ? <Loader2 size={14} className="animate-spin" /> : null}
-            Kurumu oluştur
+            {t('createButton')}
           </button>
         </div>
       </form>

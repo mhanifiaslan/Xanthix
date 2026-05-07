@@ -53,7 +53,7 @@ export default function InviteAcceptClient({
           Lütfen seni davet eden kişiden yeni bir bağlantı iste.
         </p>
         <Link
-          href={`/${locale}`}
+          href={`/${locale}/home`}
           className="mt-4 inline-flex justify-center px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors"
         >
           Ana sayfaya dön

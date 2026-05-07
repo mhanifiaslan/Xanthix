@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { z } from 'zod';
 import { requireServerSession } from '@/lib/server/getServerSession';
 import {
@@ -11,12 +12,14 @@ import {
   InsufficientTokensError,
   appendAssistantMessage,
   createProjectDoc,
+  deleteProjectDeep,
   getProjectDoc,
   getTokenBalance,
   listSectionsByProject,
   markSectionFailed,
   recordGeneratedSection,
   recordRevisedSection,
+  setProjectArchived,
   setSectionStatus,
   spendTokens,
 } from '@/lib/server/projects';
@@ -40,37 +43,46 @@ import type { Locale } from '@/i18n/routing';
 
 // -----------------------------------------------------------------------------
 
-const startProjectSchema = z.object({
-  projectTypeSlug: z.string().min(1),
-  idea: z.string().min(20, 'Lütfen fikrinizi en az 20 karakterle anlatın.'),
+export interface StartProjectInput {
+  projectTypeSlug: string;
+  idea: string;
   /** sectionId → fieldId → value */
-  userInputs: z
-    .record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])))
-    .optional(),
+  userInputs?: Record<
+    string,
+    Record<string, string | number | boolean>
+  >;
   /** Optional: run this project on behalf of an organisation. Tokens come
    *  from the org wallet and the project becomes visible to all org
    *  members with read access. */
-  orgId: z.string().min(1).optional(),
-});
-
-export type StartProjectInput = z.input<typeof startProjectSchema>;
+  orgId?: string;
+}
 
 export async function startProjectAction(
   rawInput: StartProjectInput,
   locale: Locale,
 ): Promise<{ projectId: string }> {
   const session = await requireServerSession();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
+  const startProjectSchema = z.object({
+    projectTypeSlug: z.string().min(1),
+    idea: z.string().min(20, t('project.ideaTooShort')),
+    userInputs: z
+      .record(
+        z.string(),
+        z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+      )
+      .optional(),
+    orgId: z.string().min(1).optional(),
+  });
+
   const input = startProjectSchema.parse(rawInput);
 
-  // Validate org context — the session claim might be stale, so we re-check
-  // membership in Firestore directly.
   const orgId = input.orgId ?? null;
   if (orgId) {
     const member = await getMemberDoc(orgId, session.uid);
     if (!member) {
-      throw new Error(
-        'Bu kuruma üye değilsin; proje açamazsın. Önce kurum üyesi olarak eklenmelisin.',
-      );
+      throw new Error(t('project.notMember'));
     }
   }
 
@@ -79,9 +91,7 @@ export async function startProjectAction(
   });
   if (!type) throw new Error('Project type not found or not accessible');
   if (type.visibility === 'org_only' && !orgId) {
-    throw new Error(
-      'Bu proje türü kuruma özel — bir kurum bağlamında başlatılmalı.',
-    );
+    throw new Error(t('project.orgOnlyType'));
   }
 
   // Bare-minimum upfront check on the wallet that will pay for it.
@@ -138,6 +148,55 @@ async function canActOnProject(
   }
   return false;
 }
+
+// -----------------------------------------------------------------------------
+
+export async function archiveProjectAction(
+  projectId: string,
+): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const project = await getProjectDoc(projectId);
+  if (!project) throw new Error('Project not found');
+  if (!(await canActOnProject(project, session))) {
+    throw new Error('Forbidden');
+  }
+  await setProjectArchived(projectId, true);
+  revalidatePath('/[locale]/projects', 'page');
+  if (project.orgId) revalidatePath(`/[locale]/organizations/${project.orgId}`, 'page');
+  return { ok: true };
+}
+
+export async function restoreProjectAction(
+  projectId: string,
+): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const project = await getProjectDoc(projectId);
+  if (!project) throw new Error('Project not found');
+  if (!(await canActOnProject(project, session))) {
+    throw new Error('Forbidden');
+  }
+  await setProjectArchived(projectId, false);
+  revalidatePath('/[locale]/projects', 'page');
+  if (project.orgId) revalidatePath(`/[locale]/organizations/${project.orgId}`, 'page');
+  return { ok: true };
+}
+
+export async function deleteProjectAction(
+  projectId: string,
+): Promise<{ ok: true }> {
+  const session = await requireServerSession();
+  const project = await getProjectDoc(projectId);
+  if (!project) throw new Error('Project not found');
+  if (!(await canActOnProject(project, session))) {
+    throw new Error('Forbidden');
+  }
+  await deleteProjectDeep(projectId);
+  revalidatePath('/[locale]/projects', 'page');
+  if (project.orgId) revalidatePath(`/[locale]/organizations/${project.orgId}`, 'page');
+  return { ok: true };
+}
+
+// -----------------------------------------------------------------------------
 
 export async function generateNextSectionAction(
   projectId: string,
@@ -422,21 +481,28 @@ export async function generateNextSectionAction(
 
 // -----------------------------------------------------------------------------
 
-const reviseSectionSchema = z.object({
-  projectId: z.string().min(1),
-  sectionId: z.string().min(1),
-  instruction: z
-    .string()
-    .min(8, 'Lütfen revizyon talebini en az 8 karakterle yaz.')
-    .max(2000),
-});
-
-export type ReviseSectionInput = z.input<typeof reviseSectionSchema>;
+export interface ReviseSectionInput {
+  projectId: string;
+  sectionId: string;
+  instruction: string;
+}
 
 export async function reviseSectionAction(
   rawInput: ReviseSectionInput,
 ): Promise<{ ok: true }> {
   const session = await requireServerSession();
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: 'errors' });
+
+  const reviseSectionSchema = z.object({
+    projectId: z.string().min(1),
+    sectionId: z.string().min(1),
+    instruction: z
+      .string()
+      .min(8, t('project.revisionTooShort'))
+      .max(2000),
+  });
+
   const input = reviseSectionSchema.parse(rawInput);
 
   const project = await getProjectDoc(input.projectId);
@@ -445,9 +511,7 @@ export async function reviseSectionAction(
     throw new Error('Forbidden');
   }
   if (project.status === 'generating') {
-    throw new Error(
-      'Bu proje hâlâ üretiliyor. Tüm bölümler bittikten sonra revize edebilirsin.',
-    );
+    throw new Error(t('project.stillGenerating'));
   }
 
   const sectionRef = getAdminFirestore()
@@ -705,7 +769,11 @@ export async function evaluateSectionAction(rawInput: z.input<typeof evaluateSec
   
   const content = sectionDocData.content;
   if (!content) {
-    throw new Error('Değerlendirilecek içerik bulunamadı.');
+    {
+      const locale = await getLocale();
+      const tErr = await getTranslations({ locale, namespace: 'errors' });
+      throw new Error(tErr('project.noContent'));
+    }
   }
 
   const type = await getProjectTypeById(project.projectTypeId);
@@ -715,7 +783,11 @@ export async function evaluateSectionAction(rawInput: z.input<typeof evaluateSec
   if (!sectionTemplate) throw new Error('Section template not found');
   
   if (!sectionTemplate.rubric) {
-    throw new Error('Bu bölüm için değerlendirme kriteri (rubric) bulunmuyor.');
+    {
+      const locale = await getLocale();
+      const tErr = await getTranslations({ locale, namespace: 'errors' });
+      throw new Error(tErr('project.noRubric'));
+    }
   }
 
   // Bare-minimum upfront check on the wallet that will pay for it.

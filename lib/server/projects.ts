@@ -89,6 +89,37 @@ export async function listSectionsByProject(projectId: string): Promise<SectionD
   return snap.docs.map(toSectionDoc).filter((s): s is SectionDoc => s !== null);
 }
 
+// ----- Archive / restore / delete -------------------------------------------
+
+export async function setProjectArchived(
+  projectId: string,
+  archived: boolean,
+): Promise<void> {
+  await db().collection('projects').doc(projectId).update({
+    status: archived ? 'archived' : 'draft',
+    archivedAt: archived ? FieldValue.serverTimestamp() : null,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+/**
+ * Hard delete a project and every section under it. Uses an admin batch
+ * — fine up to ~500 docs which more than covers our per-project ceiling.
+ */
+export async function deleteProjectDeep(projectId: string): Promise<void> {
+  const projectRef = db().collection('projects').doc(projectId);
+  const sectionsSnap = await projectRef.collection('sections').get();
+  const messagesSnap = await projectRef.collection('messages').get().catch(() => null);
+
+  const batch = db().batch();
+  sectionsSnap.docs.forEach((d) => batch.delete(d.ref));
+  if (messagesSnap) {
+    messagesSnap.docs.forEach((d) => batch.delete(d.ref));
+  }
+  batch.delete(projectRef);
+  await batch.commit();
+}
+
 // ----- Project lifecycle ----------------------------------------------------
 
 export interface CreateProjectInput {

@@ -5,6 +5,7 @@ import { setRequestLocale, getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import '../globals.css';
 import { AuthProvider } from '@/lib/auth/AuthProvider';
+import NavProgress from '@/components/system/NavProgress';
 import { routing } from '@/i18n/routing';
 
 const inter = Inter({
@@ -41,7 +42,10 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${inter.variable} h-full antialiased`}>
       <body className="h-full flex flex-col">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <NavProgress />
+            {children}
+          </AuthProvider>
         </NextIntlClientProvider>
       </body>
     </html>

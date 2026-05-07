@@ -3,9 +3,10 @@
 import { type FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Bot, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { FirebaseError } from 'firebase/app';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import AnimatedWordmark from '@/components/landing/AnimatedWordmark';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('auth.forgot');
@@ -42,17 +43,15 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 mb-4">
-          <Bot size={28} className="text-[var(--color-accent)]" />
-        </div>
-        <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-          {tApp('name')}
-        </h1>
+    <div className="w-full">
+      <div className="text-center mb-8 flex flex-col items-center">
+        <AnimatedWordmark size="md" />
+        <p className="text-sm text-[var(--color-text-secondary)] mt-3">
+          {tApp('tagline')}
+        </p>
       </div>
 
-      <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 p-8">
+      <div className="bg-[var(--color-card)]/90 backdrop-blur-sm rounded-2xl border border-white/5 p-8 shadow-2xl">
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-1">
           {t('title')}
         </h2>

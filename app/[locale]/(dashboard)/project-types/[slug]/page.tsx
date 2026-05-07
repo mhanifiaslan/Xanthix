@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Calendar, Globe, Plus, Wallet } from 'lucide-react';
 import { hasLocale } from 'next-intl';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getProjectTypeBySlug } from '@/lib/server/projectTypes';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { routing, type Locale } from '@/i18n/routing';
@@ -10,11 +10,11 @@ import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 
 export const dynamic = 'force-dynamic';
 
-const TIER_LABELS: Record<string, { tr: string; en: string; es: string }> = {
-  economy: { tr: 'Ekonomik', en: 'Economy', es: 'Economy' },
-  standard: { tr: 'Standart', en: 'Standard', es: 'Standard' },
-  premium: { tr: 'Premium', en: 'Premium', es: 'Premium' },
-  enterprise: { tr: 'Kurumsal', en: 'Enterprise', es: 'Enterprise' },
+const TIER_KEYS: Record<string, string> = {
+  economy: 'tierEconomy',
+  standard: 'tierStandard',
+  premium: 'tierPremium',
+  enterprise: 'tierEnterprise',
 };
 
 export default async function ProjectTypeDetailPage({
@@ -34,7 +34,9 @@ export default async function ProjectTypeDetailPage({
 
   const loc = locale as Locale;
   const Icon = projectTypeIcon(type.iconName);
-  const tierLabel = TIER_LABELS[type.tier]?.[loc] ?? type.tier;
+  const t = await getTranslations({ locale, namespace: 'projectTypes' });
+  const tierKey = TIER_KEYS[type.tier];
+  const tierLabel = tierKey ? t(tierKey) : type.tier;
 
   return (
     <div className="min-h-full pb-12">
@@ -74,7 +76,7 @@ export default async function ProjectTypeDetailPage({
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
             >
               <Plus size={16} />
-              Start project
+              {t('startFromType')}
             </Link>
           </div>
         </div>
@@ -84,14 +86,14 @@ export default async function ProjectTypeDetailPage({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             {type.whoCanApplyHint && (
-              <Card title="Who can apply">
+              <Card title={t('whoCanApply')}>
                 <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
                   {type.whoCanApplyHint[loc] ?? type.whoCanApplyHint.en}
                 </p>
               </Card>
             )}
 
-            <Card title={`Sections (${type.sections.length})`}>
+            <Card title={t('sectionsTitle', { count: type.sections.length })}>
               <ol className="space-y-3">
                 {type.sections.map((s) => (
                   <li key={s.id} className="flex items-start gap-3">
@@ -115,15 +117,15 @@ export default async function ProjectTypeDetailPage({
           <div className="space-y-6">
             <div className="bg-gradient-to-b from-[var(--color-accent)]/10 to-[var(--color-card)] rounded-2xl border border-[var(--color-accent)]/20 p-5">
               <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">
-                What you'll get
+                {t('whatYouGet')}
               </h2>
               <ul className="space-y-2.5">
                 {[
-                  `Full draft across ${type.sections.length} structured sections`,
-                  'Reviewer-style critique pass',
-                  'Budget table & timeline',
-                  'AI-assisted revisions',
-                  'PDF / DOCX / XLSX export',
+                  t('benefitFullDraft', { count: type.sections.length }),
+                  t('benefitCritique'),
+                  t('benefitBudget'),
+                  t('benefitRevisions'),
+                  t('benefitExport'),
                 ].map((item, i) => (
                   <li
                     key={i}
@@ -136,7 +138,7 @@ export default async function ProjectTypeDetailPage({
               </ul>
               <div className="mt-4 pt-4 border-t border-white/10">
                 <p className="text-xs text-[var(--color-text-secondary)] mb-1">
-                  Tier
+                  {t('tierLabel')}
                 </p>
                 <p className="text-xl font-bold text-[var(--color-accent)]">
                   {tierLabel}

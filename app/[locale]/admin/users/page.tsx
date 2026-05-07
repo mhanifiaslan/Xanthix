@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { Search, UserPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -23,9 +24,13 @@ async function fetchUsers(): Promise<AdminUserView[]> {
   return res.json();
 }
 
+type StatusFilter = 'all' | 'active' | 'inactive';
+
 export default function AdminUsersPage() {
+  const locale = useLocale();
+  const t = useTranslations('admin.users');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Tümü');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [users, setUsers] = useState<AdminUserView[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -37,16 +42,20 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const statusOptions = ['Tümü', 'Aktif', 'Pasif'];
+  const statusOptions: { value: StatusFilter; label: string }[] = [
+    { value: 'all', label: t('filterAll') },
+    { value: 'active', label: t('filterActive') },
+    { value: 'inactive', label: t('filterInactive') },
+  ];
 
   const filtered = users.filter((u) => {
     const matchSearch =
       u.displayName.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase());
     const matchStatus =
-      statusFilter === 'Tümü' ||
-      (statusFilter === 'Aktif' && !u.disabled) ||
-      (statusFilter === 'Pasif' && u.disabled);
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && !u.disabled) ||
+      (statusFilter === 'inactive' && u.disabled);
     return matchSearch && matchStatus;
   });
 
@@ -54,20 +63,18 @@ export default function AdminUsersPage() {
     <div className="min-h-full pb-12">
       <header className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[var(--color-text-primary)]">Kullanıcılar</h1>
+          <h1 className="text-xl font-bold text-[var(--color-text-primary)]">{t('title')}</h1>
           <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
-            {loading ? 'Yükleniyor…' : `Toplam ${users.length} kullanıcı`}
+            {loading ? t('loading') : t('totalCount', { count: users.length })}
           </p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors">
           <UserPlus size={15} />
-          Kullanıcı Ekle
+          {t('addUser')}
         </button>
       </header>
 
       <div className="px-8 py-6 max-w-7xl mx-auto space-y-5">
-
-        {/* Filtreler */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" />
@@ -75,34 +82,33 @@ export default function AdminUsersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ad veya email ile ara..."
+              placeholder={t('search')}
               className="w-full bg-[var(--color-card)] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition-all"
             />
           </div>
           <div className="flex gap-2">
             {statusOptions.map((p) => (
               <button
-                key={p}
-                onClick={() => setStatusFilter(p)}
+                key={p.value}
+                onClick={() => setStatusFilter(p.value)}
                 className={cn(
                   'px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
-                  statusFilter === p
+                  statusFilter === p.value
                     ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 text-[var(--color-accent)]'
                     : 'bg-[var(--color-card)] border-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/10'
                 )}
               >
-                {p}
+                {p.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Tablo */}
         <div className="bg-[var(--color-card)] rounded-2xl border border-white/5 overflow-hidden">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-white/5 bg-[var(--color-sidebar)]/50">
-                {['Kullanıcı', 'Token Bakiyesi', 'Proje', 'Son Giriş', 'Durum'].map((h) => (
+                {[t('tableUser'), t('tableTokenBalance'), t('tableProjects'), t('tableLastLogin'), t('tableStatus')].map((h) => (
                   <th key={h} className="px-5 py-3.5 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -113,18 +119,19 @@ export default function AdminUsersPage() {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-16 text-center text-sm text-[var(--color-text-secondary)]">
-                    Yükleniyor…
+                    {t('loading')}
                   </td>
                 </tr>
               ) : filtered.map((user) => (
                 <tr
                   key={user.uid}
-                  onClick={() => router.push(`admin/users/${user.uid}`)}
+                  onClick={() => router.push(`/${locale}/admin/users/${user.uid}`)}
                   className="hover:bg-white/[0.025] transition-colors cursor-pointer"
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       {user.photoURL ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-[var(--color-accent)]/20 border border-[var(--color-accent)]/30 flex items-center justify-center text-xs font-bold text-[var(--color-accent)] shrink-0">
@@ -138,13 +145,13 @@ export default function AdminUsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-4 text-sm tabular-nums text-[var(--color-text-primary)]">
-                    {user.tokenBalance.toLocaleString('tr-TR')}
+                    {user.tokenBalance.toLocaleString(locale)}
                   </td>
                   <td className="px-5 py-4 text-sm tabular-nums text-[var(--color-text-primary)]">
                     {user.projectCount}
                   </td>
                   <td className="px-5 py-4 text-xs text-[var(--color-text-secondary)]">
-                    {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString('tr-TR') : '—'}
+                    {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString(locale) : '—'}
                   </td>
                   <td className="px-5 py-4">
                     <span className={cn(
@@ -153,7 +160,7 @@ export default function AdminUsersPage() {
                         ? 'text-[var(--color-error)] bg-[var(--color-error)]/10 border-[var(--color-error)]/20'
                         : 'text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/20'
                     )}>
-                      {user.disabled ? 'Pasif' : 'Aktif'}
+                      {user.disabled ? t('statusDisabled') : t('statusActive')}
                     </span>
                   </td>
                 </tr>
@@ -163,17 +170,16 @@ export default function AdminUsersPage() {
 
           {!loading && filtered.length === 0 && (
             <div className="py-16 text-center text-sm text-[var(--color-text-secondary)]">
-              Sonuç bulunamadı.
+              {t('noResults')}
             </div>
           )}
         </div>
 
-        {/* Özet */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Aktif', value: users.filter((u) => !u.disabled).length, color: 'text-[var(--color-success)]' },
-            { label: 'Pasif', value: users.filter((u) => u.disabled).length, color: 'text-[var(--color-error)]' },
-            { label: 'Toplam', value: users.length, color: 'text-[var(--color-accent)]' },
+            { label: t('summaryActive'), value: users.filter((u) => !u.disabled).length, color: 'text-[var(--color-success)]' },
+            { label: t('summaryInactive'), value: users.filter((u) => u.disabled).length, color: 'text-[var(--color-error)]' },
+            { label: t('summaryTotal'), value: users.length, color: 'text-[var(--color-accent)]' },
           ].map((s) => (
             <div key={s.label} className="bg-[var(--color-card)] rounded-xl border border-white/5 p-4 text-center">
               <p className={cn('text-2xl font-bold tabular-nums', s.color)}>{s.value}</p>
@@ -181,7 +187,6 @@ export default function AdminUsersPage() {
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

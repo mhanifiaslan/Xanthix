@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useUserDoc } from '@/lib/hooks/useUserDoc';
 import { getFirebaseFirestore } from '@/lib/firebase/client';
@@ -16,6 +16,7 @@ interface WalletDisplay {
 
 export default function CreditDisplay({ wallet }: { wallet: WalletDisplay }) {
   const locale = useLocale() as 'tr' | 'en' | 'es';
+  const t = useTranslations('wallet');
   const userDoc = useUserDoc();
   const orgBalance = useOrgBalance(
     wallet.kind === 'org' ? wallet.orgId ?? null : null,
@@ -29,7 +30,7 @@ export default function CreditDisplay({ wallet }: { wallet: WalletDisplay }) {
 
   return (
     <div className="mb-6 px-4 mt-2">
-      <div className="bg-[var(--color-card)] rounded-xl p-4 border border-white/5">
+      <div className="bg-[var(--color-card)] rounded-md p-4 border border-white/5">
         <div className="flex justify-between items-start mb-3">
           <div>
             <span className="text-xs text-[var(--color-text-secondary)] block mb-1">
@@ -39,7 +40,7 @@ export default function CreditDisplay({ wallet }: { wallet: WalletDisplay }) {
               {balance === null ? '—' : balance.toLocaleString(locale)}
             </span>
             <span className="text-sm text-[var(--color-text-secondary)] ml-1">
-              token
+              {t('tokenSuffix')}
             </span>
           </div>
         </div>
@@ -47,7 +48,7 @@ export default function CreditDisplay({ wallet }: { wallet: WalletDisplay }) {
           href={`/${locale}/billing`}
           className="block text-center w-full py-2 px-4 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium hover:bg-[var(--color-accent)] hover:text-white transition-colors"
         >
-          Token yükle
+          {t('topUp')}
         </Link>
       </div>
     </div>

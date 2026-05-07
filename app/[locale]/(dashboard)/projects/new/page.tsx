@@ -1,16 +1,13 @@
-import { notFound, redirect } from 'next/navigation';
-import { hasLocale } from 'next-intl';
-import { setRequestLocale } from 'next-intl/server';
-import { getServerSession } from '@/lib/server/getServerSession';
-import { getProjectTypeBySlug } from '@/lib/server/projectTypes';
-import { listOrgsForUser } from '@/lib/server/organizations';
-import { getActiveWorkspace } from '@/lib/server/workspace';
-import { routing } from '@/i18n/routing';
-import NewProjectForm from './NewProjectForm';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewProjectPage({
+/**
+ * Legacy "/projects/new" route — superseded by "/projects/start" (the chat
+ * onboarder). Forward any links / bookmarks through with the same query
+ * string so existing flows don't 404.
+ */
+export default async function NewProjectRedirect({
   params,
   searchParams,
 }: {
@@ -18,41 +15,12 @@ export default async function NewProjectPage({
   searchParams: Promise<{ type?: string; org?: string }>;
 }) {
   const { locale } = await params;
-  if (!hasLocale(routing.locales, locale)) notFound();
-  setRequestLocale(locale);
-
-  const session = await getServerSession();
-  if (!session) redirect(`/${locale}/login`);
-
-  const { type: typeSlug, org: preselectedOrg } = await searchParams;
-  if (!typeSlug) redirect(`/${locale}/project-types`);
-
-  // Pull the user's orgs + active workspace in parallel; the active
-  // workspace becomes the default project context unless the URL pinned
-  // a different one via ?org=.
-  const [orgs, workspace] = await Promise.all([
-    listOrgsForUser(session.uid),
-    getActiveWorkspace(session.uid),
-  ]);
-  const orgIds = orgs.map((o) => o.id);
-
-  const type = await getProjectTypeBySlug(typeSlug, { orgIds });
-  if (!type) notFound();
-
-  const fallbackContext =
-    preselectedOrg ??
-    (workspace.kind === 'org' ? workspace.orgId : null);
-
-  return (
-    <NewProjectForm
-      projectType={type}
-      locale={locale}
-      orgs={orgs.map((o) => ({
-        id: o.id,
-        name: o.name,
-        tokenBalance: o.tokenBalance,
-      }))}
-      preselectedOrgId={fallbackContext}
-    />
-  );
+  const { type, org } = await searchParams;
+  const qs = new URLSearchParams();
+  if (type) qs.set('type', type);
+  if (org) qs.set('org', org);
+  const target = qs.toString()
+    ? `/${locale}/projects/start?${qs.toString()}`
+    : `/${locale}/projects/start`;
+  redirect(target);
 }
