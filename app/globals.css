@@ -28,3 +28,25 @@ body {
   font-family: var(--font-sans);
 }
 
+/*
+ * Native <select> dropdowns fall through to OS-level styling, so the
+ * options inside the popup don't inherit the page's dark theme — on Windows
+ * Chrome they show up as light text on a near-white background and become
+ * unreadable. Force explicit dark styling on every <option> so the popup
+ * uses our card surface + primary text colour everywhere.
+ */
+select option,
+select optgroup {
+  background-color: var(--color-card);
+  color: var(--color-text-primary);
+}
+
+select option:disabled {
+  color: var(--color-text-secondary);
+}
+
+select option:checked {
+  background-color: var(--color-accent);
+  color: #ffffff;
+}
+
