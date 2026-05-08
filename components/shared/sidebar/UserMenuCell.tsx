@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import {
   useRouter as useIntlRouter,
   usePathname as useIntlPathname,
@@ -10,11 +10,13 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   Archive,
+  ArrowLeft,
   ArrowRight,
   BarChart2,
   BookOpen,
   Building2,
   Check,
+  ChevronRight,
   ChevronUp,
   CreditCard,
   Globe,
@@ -23,6 +25,8 @@ import {
   MessageSquare,
   Plus,
   Settings,
+  Wrench,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { routing } from '@/i18n/routing';
@@ -82,8 +86,34 @@ export default function UserMenuCell({
   const [open, setOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [flyout, setFlyout] = useState<'tools' | 'account' | null>(null);
+  const flyoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, startTransition] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Open fly-out after a small delay so brushing across rows doesn't pop
+  // submenus open. Closing waits a tick longer so the user has time to
+  // travel diagonally toward the open submenu without losing it.
+  const scheduleFlyout = useCallback(
+    (next: 'tools' | 'account' | null, delay: number) => {
+      if (flyoutTimer.current) clearTimeout(flyoutTimer.current);
+      flyoutTimer.current = setTimeout(() => setFlyout(next), delay);
+    },
+    [],
+  );
+  const cancelFlyoutTimer = useCallback(() => {
+    if (flyoutTimer.current) {
+      clearTimeout(flyoutTimer.current);
+      flyoutTimer.current = null;
+    }
+  }, []);
+  const toggleFlyout = useCallback(
+    (next: 'tools' | 'account') => {
+      cancelFlyoutTimer();
+      setFlyout((cur) => (cur === next ? null : next));
+    },
+    [cancelFlyoutTimer],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -91,10 +121,16 @@ export default function UserMenuCell({
       if (!containerRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setLangOpen(false);
+        setFlyout(null);
       }
     };
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Close the deepest layer first so Esc feels native.
+        if (flyout) {
+          setFlyout(null);
+          return;
+        }
         setOpen(false);
         setLangOpen(false);
       }
@@ -105,7 +141,16 @@ export default function UserMenuCell({
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown', onEsc);
     };
-  }, [open]);
+  }, [open, flyout]);
+
+  // Wipe any pending flyout timer when the popover closes so a queued
+  // open doesn't fire after the user dismisses everything.
+  useEffect(() => {
+    if (!open) {
+      setFlyout(null);
+      cancelFlyoutTimer();
+    }
+  }, [open, cancelFlyoutTimer]);
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -187,7 +232,7 @@ export default function UserMenuCell({
       </button>
 
       {open && (
-        <div className="absolute left-2 right-2 bottom-full mb-2 z-30 rounded-md border border-white/10 bg-[var(--color-card)] shadow-xl overflow-hidden">
+        <div className="absolute left-2 right-2 bottom-full mb-2 z-30 rounded-md border border-white/10 bg-[var(--color-card)] shadow-xl">
           {/* Identity row — name, email */}
           <div className="px-3 py-3 border-b border-white/5">
             <p className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
@@ -272,62 +317,119 @@ export default function UserMenuCell({
             </>
           )}
 
-          {/* Tools — moved out of the sidebar */}
-          <SectionLabel>{tNavGroups('tools')}</SectionLabel>
-          <PopoverSoonItem
-            icon={<BookOpen size={15} />}
-            label={tNav('myTemplates')}
-            comingSoonLabel={tCommon('comingSoon')}
-          />
-          <PopoverLink
-            href={`/${locale}/archive`}
-            onSelect={() => setOpen(false)}
-            icon={<Archive size={15} />}
-            label={tNav('archive')}
-          />
-          <PopoverSoonItem
-            icon={<BarChart2 size={15} />}
-            label={tNav('stats')}
-            comingSoonLabel={tCommon('comingSoon')}
-          />
-
-          <Divider />
-          <SectionLabel>{tNavGroups('account')}</SectionLabel>
-          <PopoverLink
-            href={`/${locale}/settings`}
-            onSelect={() => setOpen(false)}
-            icon={<Settings size={15} />}
-            label={tNav('settings')}
-          />
-          {variant === 'user' && (
-            <PopoverLink
-              href={`/${locale}/billing`}
-              onSelect={() => setOpen(false)}
-              icon={<CreditCard size={15} />}
-              label={tNav('creditsBilling')}
-            />
-          )}
-          <PopoverLink
-            href={`/${locale}/support`}
-            onSelect={() => setOpen(false)}
-            icon={<MessageSquare size={15} />}
-            label={tNav('support')}
-          />
-          <PopoverSoonItem
-            icon={<HelpCircle size={15} />}
-            label={tNav('help')}
-            comingSoonLabel={tCommon('comingSoon')}
+          {/* Araçlar / Tools — collapsed into a single fly-out trigger */}
+          <FlyoutTrigger
+            icon={<Wrench size={15} />}
+            label={tNavGroups('tools')}
+            isOpen={flyout === 'tools'}
+            onEnter={() => {
+              cancelFlyoutTimer();
+              scheduleFlyout('tools', 150);
+            }}
+            onLeave={() => scheduleFlyout(null, 200)}
+            onClick={() => toggleFlyout('tools')}
+            flyout={
+              <FlyoutMenu
+                onMouseEnter={cancelFlyoutTimer}
+                onMouseLeave={() => scheduleFlyout(null, 200)}
+              >
+                <PopoverSoonItem
+                  icon={<BookOpen size={15} />}
+                  label={tNav('myTemplates')}
+                  comingSoonLabel={tCommon('comingSoon')}
+                />
+                <PopoverLink
+                  href={`/${locale}/archive`}
+                  onSelect={() => {
+                    setFlyout(null);
+                    setOpen(false);
+                  }}
+                  icon={<Archive size={15} />}
+                  label={tNav('archive')}
+                />
+                <PopoverSoonItem
+                  icon={<BarChart2 size={15} />}
+                  label={tNav('stats')}
+                  comingSoonLabel={tCommon('comingSoon')}
+                />
+              </FlyoutMenu>
+            }
           />
 
-          {isAdmin && (
+          {/* Hesap / Account — collapsed into a single fly-out trigger */}
+          <FlyoutTrigger
+            icon={<UserCog size={15} />}
+            label={tNavGroups('account')}
+            isOpen={flyout === 'account'}
+            onEnter={() => {
+              cancelFlyoutTimer();
+              scheduleFlyout('account', 150);
+            }}
+            onLeave={() => scheduleFlyout(null, 200)}
+            onClick={() => toggleFlyout('account')}
+            flyout={
+              <FlyoutMenu
+                onMouseEnter={cancelFlyoutTimer}
+                onMouseLeave={() => scheduleFlyout(null, 200)}
+              >
+                <PopoverLink
+                  href={`/${locale}/settings`}
+                  onSelect={() => {
+                    setFlyout(null);
+                    setOpen(false);
+                  }}
+                  icon={<Settings size={15} />}
+                  label={tNav('settings')}
+                />
+                {variant === 'user' && (
+                  <PopoverLink
+                    href={`/${locale}/billing`}
+                    onSelect={() => {
+                      setFlyout(null);
+                      setOpen(false);
+                    }}
+                    icon={<CreditCard size={15} />}
+                    label={tNav('creditsBilling')}
+                  />
+                )}
+                <PopoverLink
+                  href={`/${locale}/support`}
+                  onSelect={() => {
+                    setFlyout(null);
+                    setOpen(false);
+                  }}
+                  icon={<MessageSquare size={15} />}
+                  label={tNav('support')}
+                />
+                <PopoverSoonItem
+                  icon={<HelpCircle size={15} />}
+                  label={tNav('help')}
+                  comingSoonLabel={tCommon('comingSoon')}
+                />
+              </FlyoutMenu>
+            }
+          />
+
+          {/* Admin ↔ User panel switch */}
+          {variant === 'user' && isAdmin && (
             <>
               <Divider />
-              <SectionLabel>{tNavGroups('management')}</SectionLabel>
               <PopoverLink
                 href={`/${locale}/admin`}
                 onSelect={() => setOpen(false)}
                 icon={<ArrowRight size={15} />}
                 label={tNav('adminPanel')}
+              />
+            </>
+          )}
+          {variant === 'admin' && (
+            <>
+              <Divider />
+              <PopoverLink
+                href={`/${locale}/home`}
+                onSelect={() => setOpen(false)}
+                icon={<ArrowLeft size={15} />}
+                label={tNav('backToUserPanel')}
               />
             </>
           )}
@@ -479,6 +581,82 @@ function PopoverSoonItem({
       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 uppercase tracking-wide">
         {comingSoonLabel}
       </span>
+    </div>
+  );
+}
+
+/**
+ * A row that opens a fly-out menu to its right. Hover (with a small delay)
+ * or tap toggles the open state. Open/close timing is managed by the
+ * parent so the user can travel diagonally between trigger and submenu
+ * without losing it.
+ */
+function FlyoutTrigger({
+  icon,
+  label,
+  isOpen,
+  onEnter,
+  onLeave,
+  onClick,
+  flyout,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isOpen: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  onClick: () => void;
+  flyout: React.ReactNode;
+}) {
+  return (
+    <div
+      className="relative"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className={
+          'w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm transition-colors ' +
+          (isOpen
+            ? 'bg-white/5 text-[var(--color-text-primary)]'
+            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-white/5')
+        }
+      >
+        <span className="flex items-center gap-2">
+          {icon}
+          {label}
+        </span>
+        <ChevronRight
+          size={13}
+          className="text-[var(--color-text-secondary)]/70 shrink-0"
+        />
+      </button>
+      {isOpen && flyout}
+    </div>
+  );
+}
+
+function FlyoutMenu({
+  children,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  children: React.ReactNode;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+}) {
+  return (
+    <div
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      role="menu"
+      className="absolute left-full top-0 ml-2 w-56 rounded-md border border-white/10 bg-[var(--color-card)] shadow-xl z-40 overflow-hidden"
+    >
+      {children}
     </div>
   );
 }

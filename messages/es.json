@@ -43,7 +43,8 @@
       "settings": "Ajustes",
       "support": "Soporte",
       "help": "Ayuda",
-      "adminPanel": "Panel de administración"
+      "adminPanel": "Panel de administración",
+      "backToUserPanel": "Volver al panel de usuario"
     }
   },
   "wallet": {

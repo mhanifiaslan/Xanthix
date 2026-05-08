@@ -43,7 +43,8 @@
       "settings": "Ayarlar",
       "support": "Destek",
       "help": "Yardım",
-      "adminPanel": "Admin paneli"
+      "adminPanel": "Admin paneli",
+      "backToUserPanel": "Kullanıcı paneline dön"
     }
   },
   "wallet": {

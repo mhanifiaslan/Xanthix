@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
   LayoutDashboard, Users, CreditCard, FolderGit2, DollarSign,
-  TicketIcon, Settings, Bot, ShieldCheck, FolderTree
+  TicketIcon, Settings, Bot, ShieldCheck, FolderTree, ArrowLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserMenuCell from "@/components/shared/sidebar/UserMenuCell";
@@ -53,6 +53,7 @@ export default function AdminSidebar() {
   const tGroups = useTranslations("admin.nav.groups");
   const tItems = useTranslations("admin.nav.items");
   const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav.items");
 
   const localizedHref = (href: string) => `/${locale}${href}`;
 
@@ -72,6 +73,17 @@ export default function AdminSidebar() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Switch back to user panel — keeps admins from getting stranded */}
+      <div className="px-2 pt-3">
+        <Link
+          href={localizedHref('/home')}
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)] transition-colors"
+        >
+          <ArrowLeft size={14} className="shrink-0" />
+          {tNav('backToUserPanel')}
+        </Link>
       </div>
 
       {/* Nav */}
