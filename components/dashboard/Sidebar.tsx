@@ -8,6 +8,11 @@ import UserMenuCell, {
 } from '@/components/shared/sidebar/UserMenuCell';
 import type { ProjectType } from '@/types/projectType';
 
+interface RecentProject {
+  id: string;
+  title: string;
+}
+
 interface SidebarProps {
   featuredTypes: ProjectType[];
   isAdmin: boolean;
@@ -15,6 +20,7 @@ interface SidebarProps {
     | { kind: 'personal' }
     | { kind: 'org'; orgId: string; orgName: string };
   workspaceOrgs: OrgWorkspaceOption[];
+  recents: RecentProject[];
   /** Either user uid (personal workspace) or org id (org workspace). */
   walletDisplay: {
     kind: 'personal' | 'org';
@@ -30,6 +36,7 @@ export default function Sidebar({
   isAdmin,
   workspace,
   workspaceOrgs,
+  recents,
   walletDisplay,
 }: SidebarProps) {
   return (
@@ -46,12 +53,13 @@ export default function Sidebar({
       </div>
       <div className="flex-1 flex flex-col overflow-y-auto pt-3">
         <CreditDisplay wallet={walletDisplay} />
-        <NavMenu featuredTypes={featuredTypes} isAdmin={isAdmin} />
+        <NavMenu featuredTypes={featuredTypes} recents={recents} />
       </div>
       <UserMenuCell
         variant="user"
         workspace={workspace}
         workspaceOrgs={workspaceOrgs}
+        isAdmin={isAdmin}
       />
     </aside>
   );

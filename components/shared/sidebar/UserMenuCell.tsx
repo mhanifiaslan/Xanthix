@@ -9,12 +9,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import {
+  Archive,
+  ArrowRight,
+  BarChart2,
+  BookOpen,
   Building2,
   Check,
   ChevronUp,
   CreditCard,
   Globe,
+  HelpCircle,
   LogOut,
+  MessageSquare,
   Plus,
   Settings,
 } from 'lucide-react';
@@ -46,6 +52,8 @@ interface UserMenuCellProps {
   workspace?: ActiveWorkspace;
   /** Org workspaces the user belongs to; only relevant for the 'user' variant. */
   workspaceOrgs?: OrgWorkspaceOption[];
+  /** Drives the optional "Yönetim" section with the Admin Panel link. */
+  isAdmin?: boolean;
 }
 
 /**
@@ -58,6 +66,7 @@ export default function UserMenuCell({
   variant = 'user',
   workspace,
   workspaceOrgs = [],
+  isAdmin = false,
 }: UserMenuCellProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -67,6 +76,7 @@ export default function UserMenuCell({
   const t = useTranslations('userMenu');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav.items');
+  const tNavGroups = useTranslations('nav.groups');
   const tWorkspace = useTranslations('workspace');
 
   const [open, setOpen] = useState(false);
@@ -262,6 +272,27 @@ export default function UserMenuCell({
             </>
           )}
 
+          {/* Tools — moved out of the sidebar */}
+          <SectionLabel>{tNavGroups('tools')}</SectionLabel>
+          <PopoverSoonItem
+            icon={<BookOpen size={15} />}
+            label={tNav('myTemplates')}
+            comingSoonLabel={tCommon('comingSoon')}
+          />
+          <PopoverLink
+            href={`/${locale}/archive`}
+            onSelect={() => setOpen(false)}
+            icon={<Archive size={15} />}
+            label={tNav('archive')}
+          />
+          <PopoverSoonItem
+            icon={<BarChart2 size={15} />}
+            label={tNav('stats')}
+            comingSoonLabel={tCommon('comingSoon')}
+          />
+
+          <Divider />
+          <SectionLabel>{tNavGroups('account')}</SectionLabel>
           <PopoverLink
             href={`/${locale}/settings`}
             onSelect={() => setOpen(false)}
@@ -276,6 +307,32 @@ export default function UserMenuCell({
               label={tNav('creditsBilling')}
             />
           )}
+          <PopoverLink
+            href={`/${locale}/support`}
+            onSelect={() => setOpen(false)}
+            icon={<MessageSquare size={15} />}
+            label={tNav('support')}
+          />
+          <PopoverSoonItem
+            icon={<HelpCircle size={15} />}
+            label={tNav('help')}
+            comingSoonLabel={tCommon('comingSoon')}
+          />
+
+          {isAdmin && (
+            <>
+              <Divider />
+              <SectionLabel>{tNavGroups('management')}</SectionLabel>
+              <PopoverLink
+                href={`/${locale}/admin`}
+                onSelect={() => setOpen(false)}
+                icon={<ArrowRight size={15} />}
+                label={tNav('adminPanel')}
+              />
+            </>
+          )}
+
+          <Divider />
 
           <button
             type="button"
@@ -401,6 +458,28 @@ function PopoverLink({
       {icon}
       {label}
     </Link>
+  );
+}
+
+function PopoverSoonItem({
+  icon,
+  label,
+  comingSoonLabel,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  comingSoonLabel: string;
+}) {
+  return (
+    <div className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm text-[var(--color-text-secondary)]/60 cursor-default select-none">
+      <span className="flex items-center gap-2">
+        {icon}
+        {label}
+      </span>
+      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 uppercase tracking-wide">
+        {comingSoonLabel}
+      </span>
+    </div>
   );
 }
 

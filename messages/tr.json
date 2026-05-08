@@ -23,6 +23,8 @@
   "nav": {
     "groups": {
       "mainAccess": "Ana erişim",
+      "recents": "Son projeler",
+      "viewAll": "Tümü",
       "startNewProject": "Yeni proje başla",
       "tools": "Araçlar",
       "workspace": "Çalışma alanı",
@@ -32,6 +34,7 @@
     "items": {
       "home": "Ana sayfa",
       "projects": "Projelerim",
+      "untitledProject": "Adsız proje",
       "myTemplates": "Şablonlarım",
       "archive": "Arşiv",
       "stats": "İstatistikler",

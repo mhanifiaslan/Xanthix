@@ -23,6 +23,8 @@
   "nav": {
     "groups": {
       "mainAccess": "Main",
+      "recents": "Recents",
+      "viewAll": "View all",
       "startNewProject": "Start a new project",
       "tools": "Tools",
       "workspace": "Workspace",
@@ -32,6 +34,7 @@
     "items": {
       "home": "Home",
       "projects": "My projects",
+      "untitledProject": "Untitled project",
       "myTemplates": "My templates",
       "archive": "Archive",
       "stats": "Insights",

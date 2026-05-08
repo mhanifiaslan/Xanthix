@@ -23,6 +23,8 @@
   "nav": {
     "groups": {
       "mainAccess": "Principal",
+      "recents": "Recientes",
+      "viewAll": "Ver todo",
       "startNewProject": "Iniciar un proyecto",
       "tools": "Herramientas",
       "workspace": "Espacio de trabajo",
@@ -32,6 +34,7 @@
     "items": {
       "home": "Inicio",
       "projects": "Mis proyectos",
+      "untitledProject": "Proyecto sin título",
       "myTemplates": "Mis plantillas",
       "archive": "Archivo",
       "stats": "Estadísticas",

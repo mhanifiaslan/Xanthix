@@ -3,47 +3,42 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import {
-  Archive,
-  ArrowRight,
-  BarChart2,
-  BookOpen,
-  Building2,
-  CreditCard,
-  FolderGit2,
-  HelpCircle,
-  Home,
-  MessageSquare,
-  Settings,
-} from 'lucide-react';
+import { FolderGit2, Home } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 import type { ProjectType } from '@/types/projectType';
 
+interface RecentProject {
+  id: string;
+  title: string;
+}
+
 interface NavMenuProps {
   featuredTypes: ProjectType[];
-  isAdmin: boolean;
+  recents: RecentProject[];
 }
 
 interface NavItem {
   icon: LucideIcon;
   label: string;
   href: string;
-  soon?: boolean;
+  /** When true, only an exact pathname match marks the item active. */
+  exact?: boolean;
 }
 
 interface NavGroup {
   label: string;
+  /** Optional inline link rendered on the right of the group label (e.g. "View all"). */
+  trailing?: { label: string; href: string };
   items: NavItem[];
 }
 
-export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
+export default function NavMenu({ featuredTypes, recents }: NavMenuProps) {
   const pathname = usePathname();
   const locale = useLocale();
   const tGroups = useTranslations('nav.groups');
   const tItems = useTranslations('nav.items');
-  const tCommon = useTranslations('common');
 
   const localePath = (p: string) => `/${locale}${p === '/' ? '' : p}`;
 
@@ -51,91 +46,74 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
     {
       label: tGroups('mainAccess'),
       items: [
-        { icon: Home, label: tItems('home'), href: localePath('/home') },
+        { icon: Home, label: tItems('home'), href: localePath('/home'), exact: true },
         { icon: FolderGit2, label: tItems('projects'), href: localePath('/projects') },
-      ],
-    },
-    {
-      label: tGroups('startNewProject'),
-      items: featuredTypes.slice(0, 4).map((t) => ({
-        icon: projectTypeIcon(t.iconName),
-        label: t.name,
-        href: localePath(`/project-types/${t.slug}`),
-      })),
-    },
-    {
-      label: tGroups('tools'),
-      items: [
-        { icon: BookOpen, label: tItems('myTemplates'), href: '#', soon: true },
-        { icon: Archive, label: tItems('archive'), href: localePath('/archive') },
-        { icon: BarChart2, label: tItems('stats'), href: '#', soon: true },
-      ],
-    },
-    {
-      label: tGroups('workspace'),
-      items: [
-        { icon: Building2, label: tItems('organizations'), href: localePath('/organizations') },
-      ],
-    },
-    {
-      label: tGroups('account'),
-      items: [
-        { icon: CreditCard, label: tItems('creditsBilling'), href: localePath('/billing') },
-        { icon: Settings, label: tItems('settings'), href: localePath('/settings') },
-        { icon: MessageSquare, label: tItems('support'), href: localePath('/support') },
-        { icon: HelpCircle, label: tItems('help'), href: '#', soon: true },
       ],
     },
   ];
 
-  if (isAdmin) {
+  if (recents.length > 0) {
     groups.push({
-      label: tGroups('management'),
-      items: [
-        { icon: ArrowRight, label: tItems('adminPanel'), href: localePath('/admin') },
-      ],
+      label: tGroups('recents'),
+      trailing: { label: tGroups('viewAll'), href: localePath('/projects') },
+      items: recents.map((p) => ({
+        icon: FolderGit2,
+        label: p.title || tItems('untitledProject'),
+        href: localePath(`/projects/${p.id}`),
+      })),
     });
   }
+
+  groups.push({
+    label: tGroups('startNewProject'),
+    items: featuredTypes.slice(0, 4).map((t) => ({
+      icon: projectTypeIcon(t.iconName),
+      label: t.name,
+      href: localePath(`/project-types/${t.slug}`),
+    })),
+  });
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto px-2 pb-4">
       {groups.map((group, gi) => (
         <div key={gi} className={cn('mb-1', gi > 0 && 'mt-4')}>
-          <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/60">
-            {group.label}
-          </p>
+          <div className="px-3 mb-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/60">
+              {group.label}
+            </p>
+            {group.trailing && (
+              <Link
+                href={group.trailing.href}
+                className="text-[10px] font-medium text-[var(--color-text-secondary)]/60 hover:text-[var(--color-accent)] transition-colors"
+              >
+                {group.trailing.label}
+              </Link>
+            )}
+          </div>
           <nav className="space-y-0.5">
             {group.items.map((item) => {
-              const isActive =
-                item.href === localePath('/home')
-                  ? pathname === item.href
-                  : pathname?.startsWith(item.href) ?? false;
+              const isActive = item.exact
+                ? pathname === item.href
+                : pathname?.startsWith(item.href) ?? false;
               return (
                 <Link
                   key={item.href + item.label}
-                  href={item.soon ? '#' : item.href}
-                  onClick={item.soon ? (e) => e.preventDefault() : undefined}
+                  href={item.href}
                   className={cn(
-                    'flex items-center justify-between gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                     isActive
                       ? 'bg-[var(--color-card)] text-[var(--color-text-primary)]'
-                      : item.soon
-                        ? 'text-[var(--color-text-secondary)]/50 cursor-default'
-                        : 'text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]',
+                      : 'text-[var(--color-text-secondary)] hover:bg-white/5 hover:text-[var(--color-text-primary)]',
                   )}
                 >
-                  <span className="flex items-center gap-3">
-                    <item.icon
-                      size={16}
-                      className={isActive ? 'text-[var(--color-accent)]' : ''}
-                    />
-                    {item.label}
-                  </span>
-                  {item.soon && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/20 uppercase tracking-wide">
-                      {tCommon('comingSoon')}
-                    </span>
-                  )}
+                  <item.icon
+                    size={16}
+                    className={cn(
+                      'shrink-0',
+                      isActive ? 'text-[var(--color-accent)]' : '',
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
