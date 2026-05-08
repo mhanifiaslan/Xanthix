@@ -33,7 +33,7 @@ export default async function AdminProjectTypeGuidesPage({
     <GuidesClient
       locale={locale}
       projectTypeId={id}
-      projectTypeName={type.name.tr ?? type.name.en}
+      projectTypeName={type.name}
       initialGuides={guides.map((g) => ({
         id: g.id,
         title: g.title,

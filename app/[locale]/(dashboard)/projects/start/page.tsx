@@ -4,18 +4,20 @@ import { ArrowLeft } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { listProjectTypes, getProjectTypeBySlug } from '@/lib/server/projectTypes';
+import { listCategories } from '@/lib/server/projectCategories';
 import { listOrgsForUser } from '@/lib/server/organizations';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { getActiveWorkspace } from '@/lib/server/workspace';
 import { routing, type Locale } from '@/i18n/routing';
-import { projectTypeIcon } from '@/components/shared/ProjectTypeIcon';
 import SimpleStartForm from './SimpleStartForm';
+import TypeGrid from './TypeGrid';
 
 export const dynamic = 'force-dynamic';
 
 interface SearchParams {
   type?: string;
   prompt?: string;
+  cat?: string;
 }
 
 export default async function ProjectStartPage({
@@ -41,7 +43,10 @@ export default async function ProjectStartPage({
 
   // ── Type selection screen ─────────────────────────────────────────────
   if (!sp.type) {
-    const types = await listProjectTypes({ orgIds });
+    const [types, categories] = await Promise.all([
+      listProjectTypes({ orgIds }),
+      listCategories({ includeInactive: false }),
+    ]);
 
     return (
       <main className="min-h-full px-6 lg:px-10 py-12">
@@ -63,47 +68,27 @@ export default async function ProjectStartPage({
           </div>
         </header>
 
-        {types.length === 0 ? (
-          <div className="max-w-xl mx-auto bg-[var(--color-card)] rounded-md border border-dashed border-white/10 p-10 text-center text-sm text-[var(--color-text-secondary)]">
-            {t('noTypesAvailable')}
-          </div>
-        ) : (
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {types.map((type) => {
-              const Icon = projectTypeIcon(type.iconName);
-              const queryString = sp.prompt
-                ? `?type=${type.slug}&prompt=${encodeURIComponent(sp.prompt)}`
-                : `?type=${type.slug}`;
-              return (
-                <Link
-                  key={type.id}
-                  href={`/${locale}/projects/start${queryString}`}
-                  className="group bg-[var(--color-card)]/70 hover:bg-[var(--color-card)] border border-white/5 hover:border-white/15 rounded-md p-5 transition-all duration-200 flex flex-col gap-3"
-                >
-                  <div className="w-10 h-10 rounded-md bg-gradient-to-br from-indigo-500/25 to-violet-500/15 border border-white/10 flex items-center justify-center transition-transform group-hover:scale-105">
-                    <Icon size={18} className="text-indigo-300" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-                      {type.name[loc] ?? type.name.en}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed line-clamp-3">
-                      {type.description[loc] ?? type.description.en}
-                    </p>
-                  </div>
-                  <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between text-[10px] uppercase tracking-wider">
-                    <span className="text-[var(--color-text-secondary)]/70">
-                      {type.tier}
-                    </span>
-                    <span className="text-[var(--color-accent)]">
-                      {type.sections.length} sections
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        <TypeGrid
+          locale={locale}
+          prompt={sp.prompt ?? ''}
+          initialCategoryId={sp.cat ?? null}
+          types={types.map((tp) => ({
+            id: tp.id,
+            slug: tp.slug,
+            name: tp.name,
+            description: tp.description,
+            iconName: tp.iconName,
+            tier: tp.tier,
+            categoryId: tp.categoryId ?? null,
+            subCategoryId: tp.subCategoryId ?? null,
+            sectionsCount: tp.sections.length,
+          }))}
+          categories={categories.map((c) => ({
+            id: c.id,
+            name: c.name,
+            parentId: c.parentId,
+          }))}
+        />
       </main>
     );
   }
@@ -125,26 +110,14 @@ export default async function ProjectStartPage({
       projectType={{
         id: projectType.id,
         slug: projectType.slug,
-        name: projectType.name[loc] ?? projectType.name.en,
-        description: projectType.description[loc] ?? projectType.description.en,
+        name: projectType.name,
+        description: projectType.description,
         iconName: projectType.iconName,
         tier: projectType.tier,
         visibility: projectType.visibility,
         sections: projectType.sections.map((s) => ({
           id: s.id,
-          title: s.title[loc] ?? s.title.en,
-          requiresUserInput: s.requiresUserInput ?? false,
-          fields: (s.userInputSchema?.fields ?? []).map((f) => ({
-            id: f.id,
-            label: f.label[loc] ?? f.label.en,
-            placeholder: f.placeholder?.[loc] ?? f.placeholder?.en ?? '',
-            type: f.type,
-            required: f.required ?? false,
-            options: (f.options ?? []).map((o) => ({
-              value: o.value,
-              label: o.label[loc] ?? o.label.en,
-            })),
-          })),
+          title: s.title,
         })),
       }}
       orgs={orgOptions}

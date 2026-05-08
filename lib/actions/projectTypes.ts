@@ -94,9 +94,9 @@ keys):
 {
   "id": string (lower-kebab, ≤30 chars, e.g. "tubitak-1507"),
   "slug": same as id,
-  "name": { "tr": string, "en": string, "es": string },
-  "description": { "tr": string, "en": string, "es": string },
-  "category": one of "tubitak" | "eu" | "ipa" | "horizon" | "teknofest" | "national" | "kosgeb" | "kalkinma_ajansi" | "custom",
+  "name": string (the program / template name, in the guide's language),
+  "description": string (1-2 sentences),
+  "categoryHint": string | null (a short, lower-kebab tag like "tubitak", "horizon", "kosgeb", or "custom" — admin will resolve to a real categoryId after preview),
   "tier": one of "economy" | "standard" | "premium" | "enterprise",
   "outputLanguage": one of "tr" | "en" | "es" | "auto",
   "visibility": "public",
@@ -104,41 +104,56 @@ keys):
   "active": true,
   "version": "0.1.0",
   "generatedFromGuide": true,
-  "budgetHint":   { "tr": string, "en": string, "es": string } | null,
-  "callDatesHint": { "tr": string, "en": string, "es": string } | null,
-  "whoCanApplyHint": { "tr": string, "en": string, "es": string } | null,
+  "budgetHint": string | null,
+  "callDatesHint": string | null,
+  "whoCanApplyHint": string | null,
   "sections": [
     {
       "id": string (lower-kebab),
       "order": integer starting from 0,
-      "title": { "tr": string, "en": string, "es": string },
-      "description": { "tr": string, "en": string, "es": string },
+      "title": string,
+      "description": string,
       "agentPromptTemplate": string,
       "criteria": string[] (3-6 items),
       "outputType": one of "markdown" | "budget_table" | "gantt" | "image" | "json",
       "modelOverride": one of "flash" | "pro" | "sonnet" | "opus",
-      "estimatedTokens": integer 800-3000,
-      "requiresUserInput": boolean
+      "estimatedTokens": integer 800-3000
     }
+  ],
+  "evaluationCriteria": [
+    { "name": string, "description": string, "weight": number 1-5 }
   ]
 }
 
-Section authoring rules:
+Authoring rules:
+- All user-facing strings (name, description, section titles, criteria, etc.)
+  use a SINGLE language — match the guide's language.
 - Produce 5–9 sections, in the natural order an applicant would write them.
-- agentPromptTemplate must be a thorough instruction. Include the placeholders {{userIdea}}, {{previousSections}}, and (if requiresUserInput is true) {{userInputs}}. Spell out the deliverable, the structure, and any explicit table format requirements (use the dash-separator GFM table contract).
-- Use Turkish-preferring tone for the inline instructions if outputLanguage is "tr"; otherwise English. The prompt itself stays in English (better model performance), but instruct the model to output in {{outputLanguage}}.
-- For budget / table-bearing sections set outputType to "budget_table". Set "gantt" for explicit gantt JSON sections; otherwise "markdown".
-- Keep modelOverride realistic: "flash" for short / structured outputs, "pro" for long / analytical ones. Use "sonnet"/"opus" only for very involved sections.
-- Pick category honestly. Default to "custom" if unsure.
+- agentPromptTemplate must be a thorough instruction. Use placeholders
+  {{userIdea}} and {{previousSections}}. Spell out the deliverable, structure,
+  and any explicit table requirement (dash-separator GFM table contract).
+- For budget / table-bearing sections set outputType to "budget_table".
+  Use "gantt" for explicit gantt JSON sections; otherwise "markdown".
+- Keep modelOverride realistic: "flash" for short / structured, "pro" for
+  long / analytical. Use "sonnet"/"opus" only for very involved sections.
+- evaluationCriteria are project-LEVEL (3-5 items): what a reviewer judges
+  the whole package on (Innovation, Budget realism, etc.). Weight 1-5.
 
 Guide:
 """
 ${guide}
 """`;
 
+export interface DraftFromGuideResult {
+  draft: ProjectTypeWriteInput;
+  /** Lower-kebab tag the AI inferred from the guide — admin resolves it
+   *  to a real categoryId in the builder. */
+  categoryHint: string | null;
+}
+
 export async function draftFromGuideAction(
   raw: DraftFromGuideInput,
-): Promise<ProjectTypeWriteInput> {
+): Promise<DraftFromGuideResult> {
   const session = await requireServerSession();
   assertAdmin(session.role);
   const input = draftSchema.parse(raw);
@@ -165,13 +180,125 @@ export async function draftFromGuideAction(
     );
   }
 
-  // Don't fail outright if the AI missed a default — fill the gaps and let
-  // the admin tighten things up in the UI.
-  const safeParsed = projectTypeWriteSchema.safeParse(parsed);
-  if (safeParsed.success) return safeParsed.data;
+  return normalizeAiDraft(parsed);
+}
 
-  // Loose path — best-effort coerce. Admin reviews + saves explicitly.
-  return parsed as ProjectTypeWriteInput;
+interface RawAiDraft {
+  id?: string;
+  slug?: string;
+  name?: string;
+  description?: string;
+  categoryHint?: string | null;
+  tier?: string;
+  outputLanguage?: string;
+  visibility?: string;
+  iconName?: string;
+  active?: boolean;
+  version?: string;
+  generatedFromGuide?: boolean;
+  budgetHint?: string | null;
+  callDatesHint?: string | null;
+  whoCanApplyHint?: string | null;
+  sections?: Array<{
+    id?: string;
+    order?: number;
+    title?: string;
+    description?: string;
+    agentPromptTemplate?: string;
+    criteria?: string[];
+    outputType?: string;
+    modelOverride?: string;
+    estimatedTokens?: number;
+  }>;
+  evaluationCriteria?: Array<{
+    name?: string;
+    description?: string;
+    weight?: number;
+  }>;
+}
+
+function normalizeAiDraft(raw: unknown): DraftFromGuideResult {
+  const ai = (raw ?? {}) as RawAiDraft;
+
+  // Map sections — drop the now-removed requiresUserInput field, ensure
+  // criteria default + sane types. Coerce free-form enum-ish strings into
+  // valid enum members; the schema parse below catches anything left.
+  const VALID_OUTPUT_TYPES = [
+    'markdown',
+    'budget_table',
+    'gantt',
+    'image',
+    'json',
+  ] as const;
+  type ValidOutputType = (typeof VALID_OUTPUT_TYPES)[number];
+  const VALID_MODELS = ['flash', 'pro', 'sonnet', 'opus'] as const;
+  type ValidModel = (typeof VALID_MODELS)[number];
+
+  const sections = (ai.sections ?? []).map((s, i) => {
+    const outputType: ValidOutputType = (
+      VALID_OUTPUT_TYPES as readonly string[]
+    ).includes(s.outputType ?? '')
+      ? (s.outputType as ValidOutputType)
+      : 'markdown';
+    const modelOverride: ValidModel | undefined = (
+      VALID_MODELS as readonly string[]
+    ).includes(s.modelOverride ?? '')
+      ? (s.modelOverride as ValidModel)
+      : undefined;
+    return {
+      id: s.id || `sec-${i + 1}`,
+      order: typeof s.order === 'number' ? s.order : i,
+      title: s.title ?? '',
+      description: s.description ?? '',
+      agentPromptTemplate: s.agentPromptTemplate ?? '',
+      criteria: Array.isArray(s.criteria) ? s.criteria : [],
+      outputType,
+      modelOverride,
+      estimatedTokens: s.estimatedTokens,
+    };
+  });
+
+  const evaluationCriteria = (ai.evaluationCriteria ?? []).map((c, i) => ({
+    id: `eval-${i + 1}`,
+    name: c.name ?? '',
+    description: c.description ?? '',
+    weight: typeof c.weight === 'number' ? c.weight : 1,
+  }));
+
+  const draftCandidate = {
+    id: ai.id ?? '',
+    slug: ai.slug ?? ai.id ?? '',
+    name: ai.name ?? '',
+    description: ai.description ?? '',
+    categoryId: null as string | null,
+    subCategoryId: null as string | null,
+    tier: (ai.tier as ProjectTypeWriteInput['tier']) ?? 'standard',
+    outputLanguage:
+      (ai.outputLanguage as ProjectTypeWriteInput['outputLanguage']) ?? 'auto',
+    visibility:
+      (ai.visibility as ProjectTypeWriteInput['visibility']) ?? 'public',
+    iconName: ai.iconName ?? 'FolderGit2',
+    active: ai.active ?? true,
+    sections,
+    evaluationCriteria,
+    reportTemplates: [],
+    generatedFromGuide: true,
+    version: ai.version ?? '0.1.0',
+    budgetHint: ai.budgetHint ?? null,
+    callDatesHint: ai.callDatesHint ?? null,
+    whoCanApplyHint: ai.whoCanApplyHint ?? null,
+  } satisfies ProjectTypeWriteInput;
+
+  // Validate but don't fail outright — admin will fix gaps in the builder.
+  const safeParsed = projectTypeWriteSchema.safeParse(draftCandidate);
+  const draft = safeParsed.success
+    ? safeParsed.data
+    : (draftCandidate as ProjectTypeWriteInput);
+
+  return {
+    draft,
+    categoryHint: ai.categoryHint ?? null,
+  };
 }
 
 /**
@@ -221,7 +348,7 @@ const ALLOWED_LANGS = ['tr', 'en', 'es', 'auto'] as const;
 
 export async function draftFromGuidePdfAction(
   formData: FormData,
-): Promise<ProjectTypeWriteInput> {
+): Promise<DraftFromGuideResult> {
   const session = await requireServerSession();
   assertAdmin(session.role);
 

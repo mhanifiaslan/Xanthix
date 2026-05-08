@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation';
 import { FolderGit2, LayoutGrid, Sparkles } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import Link from 'next/link';
 import { listProjectTypes } from '@/lib/server/projectTypes';
+import { listCategories } from '@/lib/server/projectCategories';
 import {
   listProjectsByOrg,
   listProjectsByOwner,
@@ -33,8 +35,25 @@ export default async function DashboardHomePage({
 
   const workspace = await getActiveWorkspace(session.uid);
   const orgIds = workspace.kind === 'org' ? [workspace.orgId] : [];
-  const types = await listProjectTypes({ orgIds });
+  const [types, allCategories] = await Promise.all([
+    listProjectTypes({ orgIds }),
+    listCategories({ includeInactive: false }),
+  ]);
   const loc = locale as Locale;
+
+  // Top-level categories that actually have at least one matching template
+  // — sort by template count, take the top 5. Drives the chip strip below.
+  const categoryUsage = new Map<string, number>();
+  for (const tp of types) {
+    if (tp.categoryId) {
+      categoryUsage.set(tp.categoryId, (categoryUsage.get(tp.categoryId) ?? 0) + 1);
+    }
+  }
+  const popularCategories = allCategories
+    .filter((c) => c.parentId === null && categoryUsage.has(c.id))
+    .map((c) => ({ ...c, count: categoryUsage.get(c.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   const projects =
     workspace.kind === 'org'
@@ -72,6 +91,28 @@ export default async function DashboardHomePage({
             {t('helpHeadline')}
           </h1>
 
+          {popularCategories.length > 0 && (
+            <div className="mb-8">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/60 mb-3">
+                {t('browseByCategory')}
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {popularCategories.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/${locale}/projects/start?cat=${c.id}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-white/10 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-white/20 hover:bg-white/[0.03] transition-colors"
+                  >
+                    <span>{c.name}</span>
+                    <span className="text-[10px] font-mono text-[var(--color-text-secondary)]/60">
+                      {c.count}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/60 mb-3">
             {t('getStarted')}
           </p>
@@ -85,8 +126,8 @@ export default async function DashboardHomePage({
                   icon={Icon}
                   iconWrapClassName="bg-gradient-to-br from-indigo-500/25 to-violet-500/15 border border-white/10"
                   iconClassName="text-indigo-300"
-                  title={type.name[loc] ?? type.name.en}
-                  subtitle={type.description[loc] ?? type.description.en}
+                  title={type.name}
+                  subtitle={type.description}
                 />
               );
             })}
@@ -107,7 +148,7 @@ export default async function DashboardHomePage({
                 iconWrapClassName="bg-gradient-to-br from-fuchsia-500/25 to-pink-400/15 border border-white/10"
                 iconClassName="text-fuchsia-300"
                 title={t('newProject')}
-                subtitle={featured[0]?.description[loc] ?? featured[0]?.description.en ?? ''}
+                subtitle={featured[0]?.description ?? ''}
               />
             )}
 

@@ -316,13 +316,11 @@ export async function generateNextSectionAction(
     if (section.rubric && section.rubric.dimensions.length > 0) {
       const rubric = section.rubric;
       const judgeContext = {
-        projectTypeName: type.name.en,
+        projectTypeName: type.name,
         sectionTitle:
-          section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ??
-          section.title.en,
+          section.title,
         sectionDescription:
-          section.description[project.outputLanguage as 'tr' | 'en' | 'es'] ??
-          section.description.en,
+          section.description,
         outputLanguage: project.outputLanguage,
       };
       const maxAttempts = 1 + Math.max(0, rubric.maxRevisionAttempts ?? 0);
@@ -430,7 +428,7 @@ export async function generateNextSectionAction(
       sectionId: section.id,
       arrayIndex: currentIndex,
       order: section.order,
-      title: section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
+      title: section.title,
       content: bestText,
       outputType: section.outputType,
       generationMeta: {
@@ -455,7 +453,7 @@ export async function generateNextSectionAction(
     await appendAssistantMessage(
       projectId,
       section.id,
-      `✅ ${section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en}`,
+      `✅ ${section.title}`,
     );
 
     const done = section.order + 1 >= type.sections.length;
@@ -468,7 +466,7 @@ export async function generateNextSectionAction(
       arrayIndex: currentIndex,
       order: section.order,
       title:
-        section.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? section.title.en,
+        section.title,
       reason,
     });
     if (err instanceof InsufficientTokensError) {
@@ -665,8 +663,8 @@ function buildGuideQuery(
     ? (outputLanguage as 'tr' | 'en' | 'es')
     : 'en';
   const parts: string[] = [
-    section.title[lang] ?? section.title.en,
-    section.description[lang] ?? section.description.en,
+    section.title,
+    section.description,
     ...(section.criteria ?? []),
   ];
   return parts.filter(Boolean).join('\n').slice(0, 1500);
@@ -797,9 +795,9 @@ export async function evaluateSectionAction(rawInput: z.input<typeof evaluateSec
   }
 
   const judgeContext = {
-    projectTypeName: type.name.en,
-    sectionTitle: sectionTemplate.title[project.outputLanguage as 'tr' | 'en' | 'es'] ?? sectionTemplate.title.en,
-    sectionDescription: sectionTemplate.description[project.outputLanguage as 'tr' | 'en' | 'es'] ?? sectionTemplate.description.en,
+    projectTypeName: type.name,
+    sectionTitle: sectionTemplate.title,
+    sectionDescription: sectionTemplate.description,
     outputLanguage: project.outputLanguage,
   };
 

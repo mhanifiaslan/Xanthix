@@ -56,10 +56,7 @@ export async function createProjectExport(
   }
 
   const type = await getProjectTypeById(project.projectTypeId);
-  const projectTypeName =
-    type?.name[(project.outputLanguage === 'auto' ? 'en' : project.outputLanguage) as 'tr' | 'en' | 'es'] ??
-    type?.name.en ??
-    project.projectTypeSlug;
+  const projectTypeName = type?.name ?? project.projectTypeSlug;
 
   const sections = (await listSectionsByProject(args.projectId)).filter(
     (s) => s.status === 'ready',

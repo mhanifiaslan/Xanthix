@@ -2,288 +2,227 @@
 
 import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  FileText,
-  Loader2,
-  Sparkles,
-  Upload,
-  X,
-} from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { ArrowLeft, FileUp, Loader2, Sparkles } from 'lucide-react';
 import {
   draftFromGuideAction,
   draftFromGuidePdfAction,
 } from '@/lib/actions/projectTypes';
-import EditForm from '../EditForm';
 import type { ProjectTypeWriteInput } from '@/types/projectType';
+import type { ProjectCategory } from '@/types/projectCategory';
+import ProjectTypeBuilder from '../[id]/ProjectTypeBuilder';
+import { cn } from '@/lib/utils';
 
-type Lang = 'tr' | 'en' | 'es' | 'auto';
+interface Props {
+  locale: string;
+  categories: ProjectCategory[];
+}
 
-export default function FromGuideClient({ locale }: { locale: string }) {
-  const [mode, setMode] = useState<'paste' | 'upload'>('upload');
-  const [guide, setGuide] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [language, setLanguage] = useState<Lang>('auto');
+type SourceMode = 'paste' | 'pdf';
+
+export default function FromGuideClient({ locale, categories }: Props) {
+  const t = useTranslations('admin.fromGuide');
+
   const [draft, setDraft] = useState<ProjectTypeWriteInput | null>(null);
+
+  if (draft) {
+    return (
+      <ProjectTypeBuilder
+        initial={draft}
+        mode="create"
+        locale={locale}
+        categories={categories}
+      />
+    );
+  }
+
+  // The AI-suggested categoryHint is intentionally dropped on the floor —
+  // admins resolve it to a real categoryId in the builder's General tab.
+  return (
+    <FromGuideForm
+      locale={locale}
+      onDrafted={(d) => setDraft(d)}
+      t={t}
+    />
+  );
+}
+
+function FromGuideForm({
+  locale,
+  onDrafted,
+  t,
+}: {
+  locale: string;
+  onDrafted: (draft: ProjectTypeWriteInput) => void;
+  t: ReturnType<typeof useTranslations<'admin.fromGuide'>>;
+}) {
+  const [mode, setMode] = useState<SourceMode>('paste');
+  const [pasted, setPasted] = useState('');
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [hintLanguage, setHintLanguage] = useState<'tr' | 'en' | 'es' | 'auto'>(
+    'auto',
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const onFileChosen = (f: File | null) => {
+  const handleGenerate = () => {
     setError(null);
-    if (!f) {
-      setFile(null);
+    if (mode === 'paste' && pasted.trim().length < 80) {
+      setError(t('errorTooShort'));
       return;
     }
-    if (f.size > 15 * 1024 * 1024) {
-      setError('PDF 15 MB üzerinde olamaz.');
+    if (mode === 'pdf' && !pdf) {
+      setError(t('errorNoPdf'));
       return;
     }
-    if (
-      f.type !== 'application/pdf' &&
-      !f.name.toLowerCase().endsWith('.pdf')
-    ) {
-      setError('Yalnızca PDF dosyası yükleyebilirsin.');
-      return;
-    }
-    setFile(f);
-  };
-
-  const submit = () => {
-    setError(null);
     startTransition(async () => {
       try {
-        let result: ProjectTypeWriteInput;
-        if (mode === 'upload') {
-          if (!file) {
-            setError('Önce bir PDF dosyası seç.');
-            return;
-          }
+        if (mode === 'pdf' && pdf) {
           const fd = new FormData();
-          fd.set('pdf', file);
-          fd.set('hintLanguage', language);
-          result = await draftFromGuidePdfAction(fd);
+          fd.set('pdf', pdf);
+          fd.set('hintLanguage', hintLanguage);
+          const result = await draftFromGuidePdfAction(fd);
+          onDrafted(result.draft);
         } else {
-          if (guide.trim().length < 80) {
-            setError('Lütfen rehberden en az 80 karakter yapıştır.');
-            return;
-          }
-          result = await draftFromGuideAction({
-            guide: guide.trim(),
-            hintLanguage: language,
+          const result = await draftFromGuideAction({
+            guide: pasted,
+            hintLanguage,
           });
+          onDrafted(result.draft);
         }
-        setDraft(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Taslak oluşturulamadı.');
+        setError(err instanceof Error ? err.message : t('errorGeneric'));
       }
     });
   };
 
-  if (draft) {
-    return <EditForm initial={draft} mode="create" locale={locale} />;
-  }
-
   return (
-    <div className="min-h-full pb-12">
-      <header className="px-8 py-5 border-b border-white/5 flex items-center gap-4">
+    <main className="min-h-full px-6 lg:px-10 py-12">
+      <header className="max-w-3xl mx-auto mb-8 flex items-center gap-4">
         <Link
           href={`/${locale}/admin/project-types`}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
+          className="w-9 h-9 rounded-md bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
         >
-          <ArrowLeft size={18} className="text-[var(--color-text-secondary)]" />
+          <ArrowLeft size={16} className="text-[var(--color-text-secondary)]" />
         </Link>
         <div>
           <h1 className="text-xl font-bold text-[var(--color-text-primary)]">
-            AI ile rehberden taslak oluştur
+            {t('title')}
           </h1>
           <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
-            PDF rehberi yükle veya metin yapıştır — AI section yapısını ve prompt'ları çıkarsın.
+            {t('subtitle')}
           </p>
         </div>
       </header>
 
-      <div className="px-8 py-8 max-w-3xl mx-auto space-y-6">
-        <div className="rounded-2xl border border-[var(--color-accent)]/20 bg-[var(--color-accent)]/5 p-5">
-          <div className="flex items-start gap-3">
-            <Sparkles size={20} className="text-[var(--color-accent)] mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                Nasıl çalışır?
-              </p>
-              <ul className="mt-2 space-y-1.5 text-xs text-[var(--color-text-secondary)] list-disc pl-4">
-                <li>
-                  Resmi çağrı dokümanını PDF olarak yükle, ya da rehberden ilgili
-                  bölümleri metin olarak yapıştır.
-                </li>
-                <li>
-                  Üret butonuna bas — AI section listesi, prompt taslakları ve
-                  metadata'yı çıkarır (~30-60 saniye).
-                </li>
-                <li>
-                  Açılan editörde her şey düzenlenebilir.
-                  Beğendiğinde <strong>Kaydet</strong>.
-                </li>
-                <li className="text-[var(--color-warning)]">
-                  Taranmış (görsel) PDF'lerden metin çıkmaz; OCR'lı PDF kullan.
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Mode toggle */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[var(--color-card)] border border-white/5">
-          <button
-            type="button"
-            onClick={() => setMode('upload')}
-            disabled={isPending}
-            className={
-              'flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ' +
-              (mode === 'upload'
-                ? 'bg-[var(--color-background)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')
-            }
-          >
-            <Upload size={14} /> PDF yükle
-          </button>
+      <div className="max-w-3xl mx-auto space-y-5">
+        <div className="flex items-center gap-1 border border-white/10 rounded-md p-1 w-fit">
           <button
             type="button"
             onClick={() => setMode('paste')}
-            disabled={isPending}
-            className={
-              'flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ' +
-              (mode === 'paste'
-                ? 'bg-[var(--color-background)] text-[var(--color-text-primary)] shadow-sm'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]')
-            }
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+              mode === 'paste'
+                ? 'bg-white/10 text-[var(--color-text-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+            )}
           >
-            <FileText size={14} /> Metin yapıştır
+            {t('tabPaste')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('pdf')}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded transition-colors',
+              mode === 'pdf'
+                ? 'bg-white/10 text-[var(--color-text-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]',
+            )}
+          >
+            {t('tabPdf')}
           </button>
         </div>
 
-        {mode === 'upload' ? (
-          <div>
-            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2">
-              PDF dosyası
-            </label>
-            {file ? (
-              <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <FileText size={20} className="text-[var(--color-accent)] shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-secondary)]">
-                      {(file.size / 1024).toLocaleString('tr-TR', {
-                        maximumFractionDigits: 0,
-                      })}{' '}
-                      KB
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFile(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  className="p-1.5 text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors shrink-0"
-                  aria-label="Dosyayı kaldır"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <label
-                htmlFor="pdf-input"
-                className="block rounded-xl border-2 border-dashed border-white/10 hover:border-[var(--color-accent)]/40 transition-colors p-8 text-center cursor-pointer"
-              >
-                <Upload className="mx-auto mb-3 text-[var(--color-text-secondary)]" size={28} />
-                <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                  PDF dosyası seç
-                </p>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                  Çağrı rehberi · maksimum 15 MB · OCR'lı (metin tabanlı) PDF
-                </p>
-              </label>
-            )}
-            <input
-              ref={fileInputRef}
-              id="pdf-input"
-              type="file"
-              accept="application/pdf,.pdf"
-              className="sr-only"
-              onChange={(e) => onFileChosen(e.target.files?.[0] ?? null)}
-              disabled={isPending}
-            />
-          </div>
+        {mode === 'paste' ? (
+          <textarea
+            value={pasted}
+            onChange={(e) => setPasted(e.target.value)}
+            placeholder={t('pastePlaceholder')}
+            rows={14}
+            className="w-full bg-[var(--color-card)] border border-white/10 rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)] resize-y"
+          />
         ) : (
-          <div className="space-y-3">
-            <label className="block text-sm font-semibold text-[var(--color-text-primary)]">
-              Rehber metni
-            </label>
-            <textarea
-              value={guide}
-              onChange={(e) => setGuide(e.target.value)}
-              rows={16}
-              placeholder="Çağrı dokümanından kapsam, başvuru bölümleri ve kriterleri içeren bölümleri buraya yapıştır…"
-              className="w-full bg-[var(--color-background)] border border-white/10 rounded-xl px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent transition-all resize-y"
-              disabled={isPending}
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={(e) => setPdf(e.target.files?.[0] ?? null)}
+              className="hidden"
             />
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              {guide.trim().length} karakter / 80+ gerekli
-            </p>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="w-full border border-dashed border-white/15 rounded-md p-10 flex flex-col items-center justify-center gap-2 text-[var(--color-text-secondary)] hover:border-white/25 hover:text-[var(--color-text-primary)] transition-colors"
+            >
+              <FileUp size={22} />
+              <span className="text-sm">
+                {pdf ? pdf.name : t('pdfDropzone')}
+              </span>
+              {pdf && (
+                <span className="text-[11px] text-[var(--color-text-secondary)]/70">
+                  {(pdf.size / 1024 / 1024).toFixed(2)} MB
+                </span>
+              )}
+            </button>
           </div>
         )}
 
-        <div>
-          <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">
-            Çıktı dili önerisi
+        <div className="flex items-center gap-3">
+          <label className="text-[11px] uppercase tracking-wider text-[var(--color-text-secondary)]">
+            {t('outputLanguage')}
           </label>
           <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as Lang)}
-            className="w-full bg-[var(--color-background)] border border-white/10 rounded-xl px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition-all"
-            disabled={isPending}
+            value={hintLanguage}
+            onChange={(e) =>
+              setHintLanguage(e.target.value as typeof hintLanguage)
+            }
+            className="bg-[var(--color-card)] border border-white/10 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent)]"
           >
-            <option value="auto">Otomatik (kullanıcı seçer)</option>
-            <option value="tr">Türkçe</option>
-            <option value="en">English</option>
-            <option value="es">Español</option>
+            <option value="auto">auto</option>
+            <option value="tr">tr</option>
+            <option value="en">en</option>
+            <option value="es">es</option>
           </select>
         </div>
 
         {error && (
-          <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-xl px-4 py-3 text-sm text-[var(--color-error)]">
+          <div className="text-xs text-[var(--color-error)] bg-[var(--color-error)]/10 border border-[var(--color-error)]/30 rounded-md px-3 py-2">
             {error}
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end">
           <button
             type="button"
-            onClick={submit}
-            disabled={
-              isPending ||
-              (mode === 'upload' ? !file : guide.trim().length < 80)
-            }
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+            onClick={handleGenerate}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-md bg-[var(--color-accent)] text-[var(--color-background)] hover:bg-[var(--color-accent)]/90 transition-colors disabled:opacity-50"
           >
             {isPending ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <Sparkles size={14} />
             )}
-            {isPending
-              ? mode === 'upload'
-                ? 'PDF okunuyor + AI hazırlıyor…'
-                : 'AI taslak hazırlıyor…'
-              : 'Taslak üret'}
+            {isPending ? t('generating') : t('generate')}
           </button>
         </div>
+
+        <div className="text-[11px] text-[var(--color-text-secondary)]/70 leading-relaxed border-t border-white/5 pt-4">
+          {t('helper')}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

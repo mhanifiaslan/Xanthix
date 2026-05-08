@@ -140,7 +140,7 @@ export function buildSystemPrompt(
   opts: { hasGuide?: boolean } = {},
 ): string {
   const lines = [
-    `You are an expert grant writer drafting a section of a "${projectType.name.en}" funding application.`,
+    `You are an expert grant writer drafting a section of a "${projectType.name}" funding application.`,
     'Match the tone and conventions expected by program reviewers.',
     'Be concrete, evidence-driven, and avoid filler.',
     'When you need a fact you do not have, surface it as a clearly-marked TODO so the user can fill it in.',
@@ -197,9 +197,7 @@ export function buildJudgePrompt(args: BuildJudgePromptArgs): string {
 
   const dimensionLines = args.rubric.dimensions
     .map((d) => {
-      const name = pickLocalized(d.name, lang);
-      const desc = pickLocalized(d.descriptor, lang);
-      return `- id: "${d.id}" (max ${d.maxPoints} pts) — ${name}\n  Scoring guide: ${desc}`;
+      return `- id: "${d.id}" (max ${d.maxPoints} pts) — ${d.name}\n  Scoring guide: ${d.descriptor}`;
     })
     .join('\n');
 
@@ -237,14 +235,6 @@ export function buildJudgePrompt(args: BuildJudgePromptArgs): string {
     `- Suggestions: 1-2 sentences in ${lang} on what would raise this dimension's score. Empty string if it's already at max.`,
     '- Do not include any text outside the JSON object.',
   ].join('\n');
-}
-
-function pickLocalized(
-  loc: { tr: string; en: string; es: string },
-  lang: string,
-): string {
-  if (lang === 'tr' || lang === 'en' || lang === 'es') return loc[lang];
-  return loc.en;
 }
 
 interface BuildJudgeRevisionPromptArgs {

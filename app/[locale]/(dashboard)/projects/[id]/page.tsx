@@ -3,6 +3,7 @@ import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/server/getServerSession';
 import { getProjectDoc, listSectionsByProject } from '@/lib/server/projects';
+import { getProjectTypeById } from '@/lib/server/projectTypes';
 import { getMemberDoc, getOrgDoc } from '@/lib/server/organizations';
 import { routing } from '@/i18n/routing';
 import ProjectView from './ProjectView';
@@ -36,9 +37,10 @@ export default async function ProjectPage({
     notFound();
   }
 
-  const [initialSections, org] = await Promise.all([
+  const [initialSections, org, projectType] = await Promise.all([
     listSectionsByProject(id),
     project.orgId ? getOrgDoc(project.orgId) : Promise.resolve(null),
+    getProjectTypeById(project.projectTypeId),
   ]);
 
   return (
@@ -57,6 +59,13 @@ export default async function ProjectPage({
         projectTypeSlug: project.projectTypeSlug,
         orgId: project.orgId ?? null,
         orgName: org?.name ?? null,
+        reportTemplates: (projectType?.reportTemplates ?? []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          fileFormat: r.fileFormat,
+        })),
+        hasEvaluationCriteria:
+          (projectType?.evaluationCriteria ?? []).length > 0,
       }}
       initialSections={initialSections.map((s) => ({
         id: s.id,

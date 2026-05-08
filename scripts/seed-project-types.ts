@@ -59,7 +59,7 @@ async function main() {
     );
     written++;
     console.log(
-      `  ${existing.exists ? '↻' : '+'} ${parsed.id.padEnd(24)} ${parsed.name.tr}`,
+      `  ${existing.exists ? '↻' : '+'} ${parsed.id.padEnd(24)} ${parsed.name}`,
     );
   }
 

@@ -106,9 +106,9 @@ export default async function AdminProjectTypesPage({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <h2 className="text-base font-semibold text-[var(--color-text-primary)]">
-                          {t.name[loc] ?? t.name.en}
+                          {t.name}
                         </h2>
-                        <Tag>{t.category}</Tag>
+                        {t.categoryId && <Tag>{t.categoryId}</Tag>}
                         <Tag>{t.tier}</Tag>
                         <Tag>output: {t.outputLanguage}</Tag>
                         <Tag>{t.visibility}</Tag>
@@ -117,7 +117,7 @@ export default async function AdminProjectTypesPage({
                         </Tag>
                       </div>
                       <p className="text-sm text-[var(--color-text-secondary)] mb-3">
-                        {t.description[loc] ?? t.description.en}
+                        {t.description}
                       </p>
                       <div className="text-xs text-[var(--color-text-secondary)]">
                         slug:{' '}
@@ -143,7 +143,7 @@ export default async function AdminProjectTypesPage({
                           <span className="w-4 h-4 rounded bg-[var(--color-accent)]/10 text-[var(--color-accent)] text-[9px] font-bold flex items-center justify-center">
                             {s.order}
                           </span>
-                          {s.title[loc] ?? s.title.en}
+                          {s.title}
                         </li>
                       ))}
                     </ol>

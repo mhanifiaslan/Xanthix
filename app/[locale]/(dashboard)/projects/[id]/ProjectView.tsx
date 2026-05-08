@@ -31,6 +31,7 @@ import JudgeScorecard, {
   parseScorecard,
   type ScorecardView,
 } from '@/components/project/JudgeScorecard';
+import QualityCheckButton from '@/components/project/QualityCheckButton';
 
 interface SectionView {
   id: string;
@@ -41,6 +42,12 @@ interface SectionView {
   status: 'pending' | 'generating' | 'ready' | 'revising' | 'failed';
   failureReason: string | null;
   scorecard: ScorecardView | null;
+}
+
+interface ReportTemplateView {
+  id: string;
+  name: string;
+  fileFormat: 'docx' | 'pdf';
 }
 
 interface ProjectViewData {
@@ -61,6 +68,8 @@ interface ProjectViewData {
   projectTypeSlug: string;
   orgId: string | null;
   orgName: string | null;
+  reportTemplates: ReportTemplateView[];
+  hasEvaluationCriteria: boolean;
 }
 
 export default function ProjectView({
@@ -293,8 +302,15 @@ export default function ProjectView({
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+          {project.status === 'ready' && project.hasEvaluationCriteria && (
+            <QualityCheckButton projectId={projectId} />
+          )}
           {project.status === 'ready' && (
-            <ExportButton projectId={projectId} onPdfExport={() => handlePrint()} />
+            <ExportButton
+              projectId={projectId}
+              onPdfExport={() => handlePrint()}
+              reportTemplates={project.reportTemplates}
+            />
           )}
           <StatusBadge status={project.status} />
         </div>
@@ -438,10 +454,18 @@ function StatusBadge({ status }: { status: ProjectViewData['status'] }) {
   );
 }
 
-function ExportButton({ projectId, onPdfExport }: { projectId: string; onPdfExport?: () => void }) {
+function ExportButton({
+  projectId,
+  onPdfExport,
+  reportTemplates = [],
+}: {
+  projectId: string;
+  onPdfExport?: () => void;
+  reportTemplates?: ReportTemplateView[];
+}) {
   const t = useTranslations('projectView');
   const [open, setOpen] = useState(false);
-  const [pendingFormat, setPendingFormat] = useState<'docx' | 'xlsx' | null>(null);
+  const [pendingFormat, setPendingFormat] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const trigger = (format: 'docx' | 'xlsx') => {
@@ -465,6 +489,42 @@ function ExportButton({ projectId, onPdfExport }: { projectId: string; onPdfExpo
     })();
   };
 
+  const triggerReport = (templateId: string, label: string) => {
+    setError(null);
+    setPendingFormat(label);
+    setOpen(false);
+    (async () => {
+      try {
+        const { fillReportAction } = await import(
+          '@/lib/actions/reportTemplates'
+        );
+        const { fileBase64, fileName, fileFormat } = await fillReportAction({
+          projectId,
+          templateId,
+        });
+        const mime =
+          fileFormat === 'docx'
+            ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            : 'application/pdf';
+        const bin = atob(fileBase64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('exportError'));
+      } finally {
+        setPendingFormat(null);
+      }
+    })();
+  };
+
   return (
     <div className="relative">
       <button
@@ -474,7 +534,11 @@ function ExportButton({ projectId, onPdfExport }: { projectId: string; onPdfExpo
         className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-[var(--color-accent)] to-[#6b4cff] hover:opacity-90 text-white text-xs font-bold rounded-md transition-all disabled:opacity-50"
       >
         {pendingFormat ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-        {pendingFormat ? t('exportPreparing', { format: pendingFormat.toUpperCase() }) : t('exportButton')}
+        {pendingFormat
+          ? pendingFormat.startsWith('report:')
+            ? t('exportPreparing', { format: pendingFormat.slice(7) })
+            : t('exportPreparing', { format: pendingFormat.toUpperCase() })
+          : t('exportButton')}
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-2 w-48 rounded-md border border-white/10 bg-[var(--color-card)] shadow-xl z-20 overflow-hidden">
@@ -507,6 +571,36 @@ function ExportButton({ projectId, onPdfExport }: { projectId: string; onPdfExpo
             <Download size={13} className="text-[var(--color-success)]" />
             <span className="flex-1 text-white">{t('exportExcel')}</span>
           </button>
+          {reportTemplates.length > 0 && (
+            <div className="border-t border-white/5 bg-white/[0.02]">
+              <p className="px-4 py-2 text-[10px] uppercase tracking-widest text-[var(--color-text-secondary)]/70">
+                {t('exportReports')}
+              </p>
+              {reportTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() =>
+                    triggerReport(tpl.id, `report:${tpl.name}`)
+                  }
+                  className="w-full text-left px-4 py-3 text-sm font-medium hover:bg-white/5 transition-colors flex items-center gap-3 border-t border-white/5"
+                >
+                  <Download
+                    size={13}
+                    className={
+                      tpl.fileFormat === 'docx'
+                        ? 'text-[var(--color-accent)]'
+                        : 'text-[var(--color-warning)]'
+                    }
+                  />
+                  <span className="flex-1 text-white truncate">{tpl.name}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)]/70">
+                    {tpl.fileFormat}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {error && (

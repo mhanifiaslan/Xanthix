@@ -59,7 +59,7 @@ export default function NavMenu({ featuredTypes, isAdmin }: NavMenuProps) {
       label: tGroups('startNewProject'),
       items: featuredTypes.slice(0, 4).map((t) => ({
         icon: projectTypeIcon(t.iconName),
-        label: t.name[locale as 'tr' | 'en' | 'es'] ?? t.name.en,
+        label: t.name,
         href: localePath(`/project-types/${t.slug}`),
       })),
     },

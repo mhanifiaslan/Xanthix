@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
   LayoutDashboard, Users, CreditCard, FolderGit2, DollarSign,
-  TicketIcon, Settings, Bot, ShieldCheck
+  TicketIcon, Settings, Bot, ShieldCheck, FolderTree
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserMenuCell from "@/components/shared/sidebar/UserMenuCell";
@@ -27,6 +27,7 @@ const groups: AdminGroup[] = [
   {
     labelKey: "content",
     items: [
+      { icon: FolderTree, labelKey: "categories", href: "/admin/categories" },
       { icon: FolderGit2, labelKey: "projectTypes", href: "/admin/project-types" },
       { icon: DollarSign, labelKey: "pricing", href: "/admin/pricing" },
     ],

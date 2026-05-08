@@ -17,8 +17,10 @@ interface ListFilter {
   orgIds?: readonly string[];
   /** When true, also returns inactive types (admin views). */
   includeInactive?: boolean;
-  /** Optional category filter. */
-  category?: ProjectType['category'];
+  /** Optional category filter (top-level categoryId). */
+  categoryId?: string | null;
+  /** Optional sub-category filter. */
+  subCategoryId?: string | null;
 }
 
 function db(): Firestore {
@@ -80,15 +82,16 @@ export async function listProjectTypes(filter: ListFilter = {}): Promise<Project
 
   const orgIds = filter.orgIds ?? [];
   const filtered = base.filter((t) => {
-    if (filter.category && t.category !== filter.category) return false;
+    if (filter.categoryId !== undefined && t.categoryId !== filter.categoryId) return false;
+    if (filter.subCategoryId !== undefined && t.subCategoryId !== filter.subCategoryId) return false;
     if (t.visibility === 'public') return true;
     if (!t.allowedOrgIds || t.allowedOrgIds.length === 0) return false;
     return t.allowedOrgIds.some((id) => orgIds.includes(id));
   });
 
   return filtered.slice().sort((a, b) => {
-    const c = a.category.localeCompare(b.category);
-    return c !== 0 ? c : a.name.tr.localeCompare(b.name.tr);
+    const c = (a.categoryId ?? '').localeCompare(b.categoryId ?? '');
+    return c !== 0 ? c : a.name.localeCompare(b.name);
   });
 }
 

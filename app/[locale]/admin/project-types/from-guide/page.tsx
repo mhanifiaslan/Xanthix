@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { hasLocale } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
+import { listCategories } from '@/lib/server/projectCategories';
 import { routing } from '@/i18n/routing';
 import FromGuideClient from './FromGuideClient';
 
@@ -15,5 +16,7 @@ export default async function FromGuidePage({
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
 
-  return <FromGuideClient locale={locale} />;
+  const categories = await listCategories({ includeInactive: false });
+
+  return <FromGuideClient locale={locale} categories={categories} />;
 }

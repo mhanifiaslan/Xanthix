@@ -48,21 +48,21 @@ export default async function ProjectTypeDetailPage({
             </div>
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-1">
-                {type.name[loc] ?? type.name.en}
+                {type.name}
               </h1>
               <p className="text-[var(--color-text-secondary)] text-sm">
-                {type.description[loc] ?? type.description.en}
+                {type.description}
               </p>
 
               <div className="flex flex-wrap gap-3 mt-4">
                 {type.budgetHint && (
                   <Pill icon={<Wallet size={12} className="text-[var(--color-accent)]" />}>
-                    {type.budgetHint[loc] ?? type.budgetHint.en}
+                    {type.budgetHint}
                   </Pill>
                 )}
                 {type.callDatesHint && (
                   <Pill icon={<Calendar size={12} className="text-[var(--color-warning)]" />}>
-                    {type.callDatesHint[loc] ?? type.callDatesHint.en}
+                    {type.callDatesHint}
                   </Pill>
                 )}
                 <Pill icon={<Globe size={12} className="text-[var(--color-success)]" />}>
@@ -88,7 +88,7 @@ export default async function ProjectTypeDetailPage({
             {type.whoCanApplyHint && (
               <Card title={t('whoCanApply')}>
                 <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                  {type.whoCanApplyHint[loc] ?? type.whoCanApplyHint.en}
+                  {type.whoCanApplyHint}
                 </p>
               </Card>
             )}
@@ -102,10 +102,10 @@ export default async function ProjectTypeDetailPage({
                     </span>
                     <div>
                       <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                        {s.title[loc] ?? s.title.en}
+                        {s.title}
                       </p>
                       <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed mt-0.5">
-                        {s.description[loc] ?? s.description.en}
+                        {s.description}
                       </p>
                     </div>
                   </li>

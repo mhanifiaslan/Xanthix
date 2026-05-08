@@ -15,23 +15,9 @@ import {
 import { startProjectAction, enhanceIdeaAction } from '@/lib/actions/projects';
 import type { Locale } from '@/i18n/routing';
 
-type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'select';
-type FieldValue = string | number | boolean;
-
-interface FieldDef {
-  id: string;
-  label: string;
-  placeholder: string;
-  type: FieldType;
-  required: boolean;
-  options: { value: string; label: string }[];
-}
-
 interface SectionDef {
   id: string;
   title: string;
-  requiresUserInput: boolean;
-  fields: FieldDef[];
 }
 
 interface ProjectTypeDef {
@@ -61,8 +47,9 @@ interface Props {
 
 /**
  * Notion-AI–style single-prompt starter. The user lands here after clicking
- * a template card; they paste/type their idea, optionally fill any
- * structured fields the template requires, pick a workspace, and hit Start.
+ * a template card; they paste/type their idea, pick a workspace, and hit
+ * Start. Per Phase 7B+ the form has no per-section structured input — any
+ * extra info the AI needs gets gathered in-chat during the project itself.
  */
 export default function SimpleStartForm({
   locale,
@@ -77,24 +64,15 @@ export default function SimpleStartForm({
   const loc = locale as Locale;
 
   const orgOnly = projectType.visibility === 'org_only';
-  const eligibleSections = projectType.sections.filter((s) => s.requiresUserInput && s.fields.length > 0);
   const showWorkspacePicker = orgs.length > 0;
 
   const [idea, setIdea] = useState(initialPrompt);
-  const [inputs, setInputs] = useState<Record<string, Record<string, FieldValue>>>({});
   const [contextOrgId, setContextOrgId] = useState<string>(
     orgOnly ? orgs[0]?.id ?? '' : preselectedOrgId ?? '',
   );
   const [error, setError] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isPending, startTransition] = useTransition();
-
-  const setField = (sectionId: string, fieldId: string, value: FieldValue) => {
-    setInputs((prev) => ({
-      ...prev,
-      [sectionId]: { ...(prev[sectionId] ?? {}), [fieldId]: value },
-    }));
-  };
 
   const handleEnhance = async () => {
     if (idea.trim().length < 5) {
@@ -133,7 +111,6 @@ export default function SimpleStartForm({
           {
             projectTypeSlug: projectType.slug,
             idea: idea.trim(),
-            userInputs: inputs,
             orgId: contextOrgId || undefined,
           },
           loc,
@@ -235,39 +212,6 @@ export default function SimpleStartForm({
           </section>
         )}
 
-        {/* Optional structured fields */}
-        {eligibleSections.length > 0 && (
-          <section className="space-y-2">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-secondary)]/70">
-                {t('fieldsHeading')}
-              </p>
-              <p className="text-xs text-[var(--color-text-secondary)]/70 mt-0.5">
-                {t('fieldsHint')}
-              </p>
-            </div>
-            <div className="space-y-5">
-              {eligibleSections.map((section) => (
-                <div key={section.id} className="bg-[var(--color-card)]/40 border border-white/5 rounded-md p-4 space-y-3">
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-                    {section.title}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {section.fields.map((f) => (
-                      <FieldInput
-                        key={f.id}
-                        field={f}
-                        value={inputs[section.id]?.[f.id] ?? ''}
-                        onChange={(v) => setField(section.id, f.id, v)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
         {error && (
           <div className="bg-[var(--color-error)]/10 border border-[var(--color-error)]/20 rounded-md px-4 py-3 text-sm text-[var(--color-error)]">
             {error}
@@ -320,58 +264,5 @@ function WorkspaceChip({
         <span className="text-[10px] text-[var(--color-text-secondary)]">{meta}</span>
       )}
     </button>
-  );
-}
-
-function FieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: FieldDef;
-  value: FieldValue;
-  onChange: (v: FieldValue) => void;
-}) {
-  const baseClass =
-    'w-full bg-[var(--color-background)] border border-white/10 rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/60 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] transition-all';
-  return (
-    <div>
-      <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-        {field.label}
-        {field.required && <span className="text-[var(--color-error)] ml-1">*</span>}
-      </label>
-      {field.type === 'textarea' ? (
-        <textarea
-          rows={2}
-          value={String(value ?? '')}
-          placeholder={field.placeholder}
-          onChange={(e) => onChange(e.target.value)}
-          className={`${baseClass} resize-y`}
-        />
-      ) : field.type === 'select' ? (
-        <select
-          value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
-          className={baseClass}
-        >
-          <option value="">—</option>
-          {field.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-          value={String(value ?? '')}
-          placeholder={field.placeholder}
-          onChange={(e) =>
-            onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)
-          }
-          className={baseClass}
-        />
-      )}
-    </div>
   );
 }
